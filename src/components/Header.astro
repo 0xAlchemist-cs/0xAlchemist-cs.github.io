@@ -1,0 +1,63 @@
+---
+const path = Astro.url.pathname;
+const links = [
+  { href: '/blog/', label: '文章', match: ['/blog/', '/archive/'] },
+  { href: '/categories/', label: '主题', match: ['/categories/', '/tags/'] },
+  { href: '/projects/', label: '项目', match: ['/projects/'] },
+  { href: '/about/', label: '关于', match: ['/about/'] },
+];
+---
+
+<header class="site-header">
+  <a class="brand" href="/" aria-label="0xAlchemist 的博客首页">
+    <svg viewBox="0 0 40 44" fill="none" aria-hidden="true">
+      <path
+        d="M20 2 37 12v20L20 42 3 32V12Z"
+        stroke="currentColor"
+        stroke-width="1.5"
+      />
+      <path
+        d="m13 29 7-16 7 16m-12-5h10"
+        stroke="currentColor"
+        stroke-width="1.5"
+      />
+    </svg>
+    <span>
+      0xAlchemist<span class="brand-sub">随记 · 实践 · 思考</span>
+    </span>
+  </a>
+  <nav aria-label="主导航">
+    {links.map((link) => (
+      <a
+        href={link.href}
+        aria-current={
+          link.match.some((prefix) => path.startsWith(prefix))
+            ? 'page'
+            : undefined
+        }
+      >
+        {link.label}
+      </a>
+    ))}
+    <a
+      href="/search/"
+      class="search-link"
+      aria-label="搜索文章与项目"
+      aria-current={path === '/search/' ? 'page' : undefined}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.6"
+        aria-hidden="true"
+      >
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="m16 16 5 5" />
+      </svg>
+      <span>搜索</span>
+    </a>
+  </nav>
+</header>

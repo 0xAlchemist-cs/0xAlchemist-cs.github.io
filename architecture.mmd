@@ -1,0 +1,37 @@
+flowchart LR
+  subgraph A["01 内容与作者"]
+    editor["作者 / Codex / Git"]
+    content["Markdown · MDX 文章"]
+    selection["精选公开项目与文章映射"]
+    editor --> content
+    editor --> selection
+  end
+  subgraph B["02 GitHub 仓库与数据"]
+    repo["公开仓库 username.github.io"]
+    ci["PR 检查：类型 / 链接 / SEO"]
+    publicapi["GitHub 公共 API：低频缓存 / 降级"]
+    repo --> ci
+    repo --> publicapi
+  end
+  subgraph C["03 构建与 SEO / GEO"]
+    audit["确定性 SEO 检查：无需 Key"]
+    ai["可选 AI 建议：Key 仅存 Secrets"]
+    astro["Astro 静态构建"]
+    assets["HTML / JSON-LD / Sitemap / robots / RSS"]
+    ci --> audit --> astro --> assets
+    ai -.人工审核建议.-> audit
+  end
+  subgraph D["04 公开访问与搜索反馈"]
+    pages["GitHub Pages 免费 HTTPS"]
+    visitors["访客浏览器"]
+    bots["搜索引擎 / AI 搜索爬虫"]
+    metrics["可选 Search Console / Bing"]
+    pages --> visitors
+    pages --> bots
+    bots -.-> metrics
+  end
+  content --> repo
+  selection --> repo
+  publicapi --> astro
+  assets --> pages
+  metrics -.证据反馈.-> editor

@@ -1,0 +1,42 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from './ArticleCard.astro';
+import Breadcrumb from './Breadcrumb.astro';
+import type { Post } from '../lib/content';
+import { breadcrumbs } from '../lib/seo';
+interface Props {
+  name: string;
+  slug: string;
+  items: Post[];
+  type: 'tags' | 'category';
+}
+const { name, slug, items, type } = Astro.props;
+const root = type === 'category' ? '/categories/' : '/tags/';
+const parent = type === 'category' ? '主题分类' : '标签';
+---
+
+<BaseLayout
+  title={`${parent}：${name}`}
+  description={`阅读「${name}」相关的 ${items.length} 篇文章。`}
+  schemas={[
+    breadcrumbs([
+      { name: parent, path: root },
+      { name, path: `${root}${slug}/` },
+    ]),
+  ]}
+>
+  <Breadcrumb items={[{ label: parent, href: root }, { label: name }]} />
+  <header class="page-heading">
+    <div class="eyebrow">{type === 'category' ? 'TOPIC' : 'TAG'}</div>
+    <h1>
+      {type === 'tags' ? '# ' : ''}
+      {name}
+    </h1>
+    <p>共 {items.length} 篇记录，按发布时间排列。</p>
+  </header>
+  <div class="listing">
+    {items.map((post) => (
+      <ArticleCard post={post} />
+    ))}
+  </div>
+</BaseLayout>

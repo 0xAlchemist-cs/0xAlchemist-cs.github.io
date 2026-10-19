@@ -1,0 +1,46 @@
+---
+import type { Post } from '../lib/content';
+import { dateLabel, readingMinutes } from '../lib/content';
+import { topicSlug } from '../lib/schemas';
+interface Props {
+  post: Post;
+  prominent?: boolean;
+}
+const { post, prominent = false } = Astro.props;
+---
+
+<article class:list={['article-card', { prominent }]}>
+  <div class="article-meta">
+    <time datetime={post.data.publishedAt.toISOString()}>
+      {dateLabel(post.data.publishedAt)}
+    </time>
+    <span class="meta-dot">·</span>
+    <a href={`/categories/${topicSlug(post.data.category)}/`}>
+      {post.data.category}
+    </a>
+    <span class="meta-dot">·</span>
+    <span>{readingMinutes(post.body)} 分钟</span>
+    {post.data.example && <span class="example-label">示例</span>}
+    {post.data.draft && <span class="example-label">草稿</span>}
+  </div>
+  <h3>
+    <a href={`/blog/${post.data.slug}/`}>{post.data.title}</a>
+  </h3>
+  <p>{post.data.description}</p>
+  <div class="card-bottom">
+    <div class="tag-list">
+      {post.data.tags.map((tag) => (
+        <a class="text-tag" href={`/tags/${topicSlug(tag)}/`}>
+          # {tag}
+        </a>
+      ))}
+    </div>
+    <a
+      class="read-link"
+      href={`/blog/${post.data.slug}/`}
+      aria-label={`阅读全文：${post.data.title}`}
+    >
+      阅读文章 <span aria-hidden="true">↗</span>
+    </a>
+  </div>
+</article>

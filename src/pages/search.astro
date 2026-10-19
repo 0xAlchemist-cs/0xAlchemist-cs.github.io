@@ -1,0 +1,55 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import '@pagefind/default-ui/css/ui.css';
+---
+
+<BaseLayout title="站内搜索" description="搜索本站公开文章与精选项目。" noindex>
+  <header class="page-heading">
+    <div class="eyebrow">FIND A THREAD</div>
+    <h1>找回某个想法。</h1>
+    <p>试试一个关键词，或者你记得的一小段文字。</p>
+  </header>
+  <section class="search-container" aria-label="站内全文搜索">
+    <div id="search"></div>
+    <p
+      id="search-status"
+      class="side-note"
+      role="status"
+      data-development={import.meta.env.DEV}
+    >
+      正在准备本地搜索索引…
+    </p>
+    <noscript>
+      <p>
+        全文搜索需要 JavaScript。你也可以从 <a href="/blog/">文章列表</a> 或{' '}
+        <a href="/tags/">标签索引</a> 浏览。
+      </p>
+    </noscript>
+  </section>
+</BaseLayout>
+<script>
+  import { PagefindUI } from '@pagefind/default-ui';
+  const status = document.querySelector<HTMLElement>('#search-status');
+  try {
+    const response = await fetch('/pagefind/pagefind.js', { method: 'HEAD' });
+    if (!response.ok) throw new Error('Index unavailable');
+    new PagefindUI({
+      element: '#search',
+      showSubResults: true,
+      showImages: false,
+      translations: {
+        placeholder: '搜索文章与项目…',
+        zero_results: '没有找到「[SEARCH_TERM]」，换个关键词试试。',
+        load_more: '加载更多',
+        clear_search: '清空',
+      },
+    });
+    if (status) status.hidden = true;
+  } catch {
+    if (status)
+      status.textContent =
+        status.dataset.development === 'true'
+          ? '开发预览不生成搜索索引。执行构建后，可在生产预览中检验全文搜索。'
+          : '搜索暂时不可用，请稍后重试，或从文章列表、标签索引继续浏览。';
+  }
+</script>

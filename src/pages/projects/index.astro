@@ -1,0 +1,32 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { projects } from '../../lib/content';
+import { breadcrumbs } from '../../lib/seo';
+const all = await projects();
+---
+
+<BaseLayout
+  title="公开项目"
+  description="手工精选的公开 GitHub 项目，以及项目背后的技术文章。"
+  schemas={[breadcrumbs([{ name: '项目', path: '/projects/' }])]}
+>
+  <header class="page-heading">
+    <div class="eyebrow">IDEAS, IN PRACTICE</div>
+    <h1>想法的另一种形状。</h1>
+    <p>在文章之外，用代码继续探索。这里只展示手工精选的公开项目。</p>
+  </header>
+  {all.length ? (
+    <div class="project-grid">
+      {all.map((project) => (
+        <ProjectCard project={project} />
+      ))}
+    </div>
+  ) : (
+    <EmptyState
+      title="精选项目待整理"
+      description="尚未确认公开展示的项目，暂不列出仓库或任何推测数据。"
+    />
+  )}
+</BaseLayout>

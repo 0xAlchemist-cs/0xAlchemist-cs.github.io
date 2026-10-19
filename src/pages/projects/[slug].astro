@@ -1,0 +1,100 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import {
+  projects,
+  posts,
+  linkedPosts,
+  dateLabel,
+  type Project,
+} from '../../lib/content';
+import { breadcrumbs } from '../../lib/seo';
+import rawCache from '../../data/github-public-cache.json';
+import { cacheSchema } from '../../lib/github';
+export async function getStaticPaths() {
+  return (await projects()).map((project) => ({
+    params: { slug: project.data.slug },
+    props: { project },
+  }));
+}
+interface Props {
+  project: Project;
+}
+const { project } = Astro.props;
+const { Content } = await render(project);
+const articles = linkedPosts(project, await posts());
+const parsed = cacheSchema.safeParse(rawCache);
+const entry = parsed.success
+  ? parsed.data.repos[project.data.repoFullName?.toLowerCase() ?? '']
+  : undefined;
+---
+
+<BaseLayout
+  title={project.data.displayName}
+  description={project.data.summary}
+  schemas={[
+    breadcrumbs([
+      { name: '项目', path: '/projects/' },
+      {
+        name: project.data.displayName,
+        path: `/projects/${project.data.slug}/`,
+      },
+    ]),
+  ]}
+>
+  <Breadcrumb
+    items={[
+      { label: '项目', href: '/projects/' },
+      { label: project.data.displayName },
+    ]}
+  />
+  <article class="paper listing" data-pagefind-body>
+    {project.data.example && (
+      <div class="notice" data-pagefind-ignore>
+        这是用于本地验收的项目配置示例，没有绑定真实仓库，也不代表作者已完成的项目。
+      </div>
+    )}
+    <header class="page-heading">
+      <div class="eyebrow">PROJECT NOTES</div>
+      <h1 data-pagefind-meta="title">{project.data.displayName}</h1>
+      <p data-pagefind-meta="description">{project.data.summary}</p>
+      <div class="project-tech">
+        {project.data.techStack.map((tech) => (
+          <span>{tech}</span>
+        ))}
+      </div>
+    </header>
+    {entry ? (
+      <div class="project-facts">
+        <span>★ {entry.data.stargazers_count}</span>
+        <span>仓库更新：{dateLabel(new Date(entry.data.updated_at))}</span>
+        <span>数据获取：{dateLabel(new Date(entry.fetchedAt))}</span>
+      </div>
+    ) : (
+      !project.data.example && (
+        <p class="side-note">尚无已验证的公开元数据；项目介绍来自手工配置。</p>
+      )
+    )}
+    <div class="project-links">
+      {project.data.repoFullName && (
+        <a href={`https://github.com/${project.data.repoFullName}`}>
+          GitHub 仓库 ↗
+        </a>
+      )}
+      {project.data.demoUrl && <a href={project.data.demoUrl}>访问演示 ↗</a>}
+    </div>
+    <div class="prose">
+      <Content />
+    </div>
+    {articles.length > 0 && (
+      <section class="related-section" data-pagefind-ignore>
+        <h2>项目背后的文章</h2>
+        {articles.map((post) => (
+          <ArticleCard post={post} />
+        ))}
+      </section>
+    )}
+  </article>
+</BaseLayout>

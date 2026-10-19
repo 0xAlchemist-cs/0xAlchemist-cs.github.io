@@ -1,0 +1,45 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { posts, dateLabel, yearLabel } from '../lib/content';
+import { breadcrumbs } from '../lib/seo';
+const all = await posts();
+const years = [...new Set(all.map((post) => yearLabel(post.data.publishedAt)))];
+---
+
+<BaseLayout
+  title="时间归档"
+  description="按年份浏览 0xAlchemist 的全部公开文章。"
+  schemas={[breadcrumbs([{ name: '时间归档', path: '/archive/' }])]}
+>
+  <header class="page-heading">
+    <div class="eyebrow">A TRAIL OF THOUGHTS</div>
+    <h1>时间留下的脚注。</h1>
+    <p>共 {all.length} 篇公开记录。一点一点，汇成自己的知识地图。</p>
+  </header>
+  <div class="listing">
+    {years.length ? (
+      years.map((year) => (
+        <section>
+          <h2 class="archive-year">{year}</h2>
+          {all
+            .filter((post) => yearLabel(post.data.publishedAt) === year)
+            .map((post) => (
+              <article class="archive-row">
+                <time datetime={post.data.publishedAt.toISOString()}>
+                  {dateLabel(post.data.publishedAt).slice(5)}
+                </time>
+                <a href={`/blog/${post.data.slug}/`}>{post.data.title}</a>
+                {post.data.example && <span class="example-label">示例</span>}
+              </article>
+            ))}
+        </section>
+      ))
+    ) : (
+      <EmptyState
+        title="时间线尚待书写"
+        description="公开文章会按年份自动归档在这里。"
+      />
+    )}
+  </div>
+</BaseLayout>

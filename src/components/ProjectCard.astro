@@ -1,0 +1,50 @@
+---
+import type { Project } from '../lib/content';
+import rawCache from '../data/github-public-cache.json';
+import { cacheSchema } from '../lib/github';
+interface Props {
+  project: Project;
+}
+const { project } = Astro.props;
+const cache = cacheSchema.safeParse(rawCache);
+const entry = cache.success
+  ? cache.data.repos[project.data.repoFullName?.toLowerCase() ?? '']
+  : undefined;
+---
+
+<article class="project-card">
+  <div class="project-top">
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.4"
+      aria-hidden="true"
+    >
+      <path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5m-9 5v10" />
+    </svg>
+    <span>
+      {project.data.example ? '示例项目' : (project.data.status ?? '公开项目')}
+    </span>
+  </div>
+  <h3>
+    <a href={`/projects/${project.data.slug}/`}>
+      {project.data.displayName}
+      <span aria-hidden="true"> ↗</span>
+    </a>
+  </h3>
+  <p>{project.data.summary}</p>
+  <div class="project-tech">
+    {project.data.techStack.map((tech) => (
+      <span>{tech}</span>
+    ))}
+  </div>
+  {entry && (
+    <p class="cache-note">
+      ★ {entry.data.stargazers_count} · 数据获取于{' '}
+      {entry.fetchedAt.slice(0, 10)}
+    </p>
+  )}
+</article>

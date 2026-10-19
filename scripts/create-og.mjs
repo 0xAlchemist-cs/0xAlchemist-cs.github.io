@@ -1,0 +1,5 @@
+import sharp from 'sharp';
+import { mkdir } from 'node:fs/promises';
+const source = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="#f7f8fc"/><rect x="70" y="65" width="1060" height="500" rx="4" fill="white" stroke="#e6eaf1"/><path d="M72 65v500" stroke="#335ddd" stroke-width="5"/><g fill="none" stroke="#9bb1eb"><path d="m940 130 115 66v132l-115 66-115-66V196Z"/><path d="m825 196 230 132m-230 0 230-132m-115-66v264"/><circle cx="940" cy="262" r="65"/></g><text x="130" y="200" font-family="Georgia,serif" font-size="25" fill="#335ddd" letter-spacing="7">THINK · BUILD · WRITE</text><text x="126" y="320" font-family="Georgia,serif" font-size="76" fill="#223045">0xAlchemist</text><text x="130" y="400" font-family="Georgia,serif" font-size="25" fill="#637084">A little space for ideas.</text><text x="130" y="515" font-family="monospace" font-size="17" fill="#637084">0xalchemist-cs.github.io</text></svg>`;
+await mkdir('public/images', { recursive: true });
+await sharp(Buffer.from(source)).png().toFile('public/images/default-og.png');

@@ -1,0 +1,46 @@
+{
+  "name": "0xalchemist-blog",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "scripts": {
+    "dev": "node scripts/astro.mjs dev --host 127.0.0.1",
+    "check": "node scripts/astro.mjs check",
+    "lint": "prettier --check .",
+    "format": "prettier --write .",
+    "build": "node scripts/astro.mjs build && node scripts/build-search.mjs",
+    "preview": "node scripts/astro.mjs preview --host 127.0.0.1",
+    "test": "tsx --test tests/*.test.ts",
+    "test:browser": "tsx scripts/prepare-browser-build.ts && playwright test",
+    "audit:content": "tsx scripts/seo-audit.ts",
+    "audit:site": "tsx scripts/check-generated-site.ts",
+    "sync:github": "tsx scripts/sync-github.ts",
+    "release:check": "tsx scripts/release-check.ts",
+    "verify": "npm run check && npm run lint && npm test && npm run audit:content && npm run build && npm run audit:site"
+  },
+  "dependencies": {
+    "@astrojs/mdx": "8.1.0",
+    "@astrojs/rss": "4.0.19",
+    "@astrojs/sitemap": "3.7.4",
+    "astro": "7.4.0",
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.10",
+    "@axe-core/playwright": "4.14.0",
+    "@pagefind/default-ui": "1.5.2",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "node-html-parser": "9.0.4",
+    "pagefind": "1.5.2",
+    "prettier": "3.9.10",
+    "prettier-plugin-astro": "1.1.1",
+    "sharp": "0.35.5",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3"
+  }
+}

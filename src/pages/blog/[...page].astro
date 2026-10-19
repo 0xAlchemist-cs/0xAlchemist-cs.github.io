@@ -1,0 +1,64 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import { posts, type Post } from '../../lib/content';
+import { site } from '../../config/site';
+import { breadcrumbs } from '../../lib/seo';
+export async function getStaticPaths() {
+  const all = await posts();
+  const pages = Math.max(1, Math.ceil(all.length / site.pageSize));
+  return Array.from({ length: pages }, (_, index) => ({
+    params: { page: index ? `page/${index + 1}` : undefined },
+    props: {
+      entries: all.slice(index * site.pageSize, (index + 1) * site.pageSize),
+      current: index + 1,
+      pages,
+    },
+  }));
+}
+interface Props {
+  entries: Post[];
+  current: number;
+  pages: number;
+}
+const { entries, current, pages } = Astro.props;
+const pageUrl = (page: number) =>
+  page === 1 ? '/blog/' : `/blog/page/${page}/`;
+---
+
+<BaseLayout
+  title={current === 1 ? '所有文章' : `所有文章 · 第 ${current} 页`}
+  description={`技术实践、学习记录与生活随笔。第 ${current} 页。`}
+  schemas={[breadcrumbs([{ name: '文章', path: '/blog/' }])]}
+>
+  <header class="page-heading">
+    <div class="eyebrow">THE JOURNAL</div>
+    <h1>写下来，就有迹可循。</h1>
+    <p>关于技术，也关于生活。不急着给好奇心划定边界。</p>
+    <nav class="page-tools" aria-label="文章浏览方式">
+      <a href="/archive/">时间归档 →</a>
+      <a href="/categories/">按主题阅读 →</a>
+      <a href="/tags/">标签索引 →</a>
+    </nav>
+  </header>
+  <div class="listing">
+    {entries.length ? (
+      entries.map((post) => <ArticleCard post={post} />)
+    ) : (
+      <EmptyState
+        title="暂时还没有公开文章"
+        description="第一篇真实文章准备好后，就会出现在这里。"
+      />
+    )}
+  </div>
+  {pages > 1 && (
+    <nav class="pagination listing" aria-label="文章分页">
+      {current > 1 ? <a href={pageUrl(current - 1)}>← 上一页</a> : <span />}
+      <span>
+        {current} / {pages}
+      </span>
+      {current < pages ? <a href={pageUrl(current + 1)}>下一页 →</a> : <span />}
+    </nav>
+  )}
+</BaseLayout>

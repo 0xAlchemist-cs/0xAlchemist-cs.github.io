@@ -1,0 +1,129 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import EmptyState from '../components/EmptyState.astro';
+import { posts, projects, topicGroups } from '../lib/content';
+const all = await posts();
+const selected = (await projects())
+  .filter((project) => project.data.featured)
+  .slice(0, 2);
+const featured = all.find((post) => post.data.featured);
+const display = featured
+  ? [featured, ...all.filter((post) => post.id !== featured.id)].slice(0, 4)
+  : all.slice(0, 4);
+const categories = topicGroups(all, 'category');
+---
+
+<BaseLayout>
+  <section class="hero" aria-labelledby="intro-heading">
+    <div class="eyebrow">A LITTLE SPACE FOR IDEAS</div>
+    <h1 id="intro-heading">
+      保持好奇，
+      <br />
+      让想法<em>落地生根。</em>
+    </h1>
+    <p>
+      我是 0xAlchemist。这里记录技术实践，也收纳生活里的零星思考。
+      <br />
+      把遇到的问题、走过的弯路，慢慢整理成可以再次出发的线索。
+    </p>
+    <div class="hero-bottom">
+      <a class="inline-link" href="/blog/">
+        翻开文章 <span aria-hidden="true">→</span>
+      </a>
+      <a class="inline-link" href="/about/">
+        关于这里 <span aria-hidden="true">↗</span>
+      </a>
+      <span class="hero-note">THINK · BUILD · WRITE</span>
+    </div>
+    <svg
+      class="hero-decoration"
+      viewBox="0 0 140 140"
+      fill="none"
+      aria-hidden="true"
+    >
+      <g stroke="#9bb1eb" stroke-width=".7">
+        <path d="m70 7 55 32v63l-55 32-55-32V39Z" />
+        <path d="m70 25 39 23v45l-39 23-39-23V48Zm0-18v127M15 39l110 63M15 102 125 39" />
+        <circle cx="70" cy="70" r="30" />
+        <path d="m31 48 78 45M31 93l78-45" />
+      </g>
+      <g fill="#557be0">
+        <circle cx="70" cy="7" r="2" />
+        <circle cx="125" cy="39" r="2" />
+        <circle cx="15" cy="102" r="2" />
+        <circle cx="70" cy="70" r="3" />
+      </g>
+    </svg>
+  </section>
+  <div class="home-grid">
+    <section aria-labelledby="latest-heading">
+      <div class="section-heading">
+        <h2 id="latest-heading">
+          最近落笔<small>THE JOURNAL</small>
+        </h2>
+        <a href="/blog/">全部文章 →</a>
+      </div>
+      {display.length ? (
+        display.map((post) => (
+          <ArticleCard post={post} prominent={post.id === featured?.id} />
+        ))
+      ) : (
+        <EmptyState
+          title="第一篇文章，正在路上"
+          description="这里将逐渐积累真实的实践记录与思考。"
+        />
+      )}
+    </section>
+    <aside class="home-sidebar" aria-label="主题与订阅">
+      <section class="side-panel">
+        <h2>沿着主题阅读</h2>
+        {categories.length ? (
+          <div class="topic-links">
+            {categories.map((category) => (
+              <a href={`/categories/${category.slug}/`}>
+                {category.name}
+                <span>{String(category.items.length).padStart(2, '0')}</span>
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p class="side-note">主题会随着文章慢慢生长。</p>
+        )}
+      </section>
+      <section class="side-panel">
+        <div class="small-caption">STAY IN THE LOOP</div>
+        <h2 style="margin-top:12px">不赶时间，慢慢更新。</h2>
+        <p class="side-note">
+          用 RSS 订阅新文章，
+          <br />
+          在你喜欢的阅读器里相遇。
+        </p>
+        <a class="inline-link" href="/rss.xml">
+          订阅 RSS ↗
+        </a>
+      </section>
+    </aside>
+  </div>
+  <section class="home-projects" aria-labelledby="projects-heading">
+    <div class="section-heading">
+      <h2 id="projects-heading">
+        把想法做出来<small>SELECTED PROJECTS</small>
+      </h2>
+      <a href="/projects/">项目一览 →</a>
+    </div>
+    {selected.length ? (
+      <div class="project-grid">
+        {selected.map((project) => (
+          <ProjectCard project={project} />
+        ))}
+      </div>
+    ) : (
+      <EmptyState
+        title="精选项目待整理"
+        description="确认公开展示的仓库后，会在这里补充项目与相关文章。"
+      />
+    )}
+  </section>
+</BaseLayout>

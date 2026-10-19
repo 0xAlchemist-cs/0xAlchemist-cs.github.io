@@ -1,0 +1,32 @@
+name: Shared quality checks
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  validate:
+    name: Validate and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run verify
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Save audit and browser evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: quality-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/
+            playwright-report/
+            test-results/
+          retention-days: 7

@@ -1,0 +1,8 @@
+<canvas id="particle-background" aria-hidden="true"></canvas>
+<script>
+  import { startBackground } from '../lib/particles';
+  const canvas = document.querySelector<HTMLCanvasElement>(
+    '#particle-background',
+  );
+  if (canvas) startBackground(canvas);
+</script>
