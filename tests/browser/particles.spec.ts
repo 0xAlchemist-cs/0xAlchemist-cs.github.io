@@ -1,5 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+test.beforeEach(async ({ page }) => {
+  // Astro's initial content-store write can request a full reload after the
+  // first paint. Keep the controlled clock/Canvas fixture alive; forward errors
+  // and all other Vite messages so actual application failures remain visible.
+  await page.routeWebSocket('ws://127.0.0.1:4321/**', (route) => {
+    const server = route.connectToServer();
+    if (!route.protocols().includes('vite-hmr')) return;
+    server.onMessage((message) => {
+      if (JSON.parse(message.toString()).type !== 'full-reload')
+        route.send(message);
+    });
+  });
+});
+
 test('周围原有粒子逐渐移入并连接，卡片区域立即消散', async ({ page }, info) => {
   test.skip(info.project.name === 'mobile', '桌面鼠标交互');
   await page.clock.install();
@@ -112,25 +126,25 @@ test('周围原有粒子逐渐移入并连接，卡片区域立即消散', async
   expect(initial.spokes).toBe(0);
   expect(
     initial.radii
-      .slice(0, 24)
+      .slice(0, 18)
       .every(
         (radius, i) =>
           radius < before.radii[i]! && radius > before.radii[i]! - 15,
       ),
   ).toBe(true);
-  expect(initial.radii.slice(24)).toEqual(before.radii.slice(24));
+  expect(initial.radii.slice(18)).toEqual(before.radii.slice(18));
   expect(initial.dots).toBe(120);
   expect(initial.minimumDotOpacity).toBe(1);
   await page.clock.runFor(1400);
   const growing = await read();
   expect(growing.spokes).toBeGreaterThan(initial.spokes);
-  expect(growing.spokes).toBeLessThan(24);
+  expect(growing.spokes).toBeLessThan(18);
   expect(growing.opacity).toBe(1);
   await page.clock.runFor(4000);
   expect((await read()).spokes).toBeGreaterThan(growing.spokes);
   await page.clock.runFor(7400);
-  expect((await read()).spokes).toBe(24);
-  expect(Math.max(...(await read()).radii.slice(0, 24))).toBeLessThan(80);
+  expect((await read()).spokes).toBe(18);
+  expect(Math.max(...(await read()).radii.slice(0, 18))).toBeLessThan(80);
   await backgroundOnly.evaluate((style) =>
     style.parentNode?.removeChild(style),
   );
@@ -229,7 +243,7 @@ test('鼠标停留后线网停止吸收外部粒子，并稳定半径与位置',
     content: '.site-shell { visibility: hidden !important; }',
   });
   await page.mouse.move(500, 500);
-  await page.clock.runFor(10000);
+  await page.clock.runFor(25000);
   const read = () =>
     page.evaluate(() =>
       (
@@ -242,7 +256,7 @@ test('鼠标停留后线网停止吸收外部粒子，并稳定半径与位置',
   const first = await read();
   await page.clock.runFor(16000);
   const later = await read();
-  expect(first.length).toBe(24);
+  expect(first.length).toBe(18);
   expect(later.length).toBe(first.length);
   expect(
     Math.max(...later.map((p) => Math.hypot(p.x - 500, p.y - 500))),

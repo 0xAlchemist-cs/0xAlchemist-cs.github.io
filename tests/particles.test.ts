@@ -90,9 +90,9 @@ test('移动鼠标时外围粒子从原位置追赶，不随圆心整体平移',
 });
 
 test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新移动可继续收集', () => {
-  const points = Array.from({ length: 28 }, (_, index) => {
+  const points = Array.from({ length: 24 }, (_, index) => {
     const angle = (index / 12) * Math.PI * 2;
-    const radius = index < 12 ? 104 : index < 20 ? 240 : 360;
+    const radius = index < 12 ? 104 : index < 16 ? 240 : 360;
     const speed = index < 12 ? 0.4 : -0.5;
     return {
       x: cursor.x + Math.cos(angle) * radius,
@@ -103,11 +103,11 @@ test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新�
   });
   const simulation = createParticleSimulation();
   const ambient = { ...points[0]! };
-  for (let frame = 0; frame < 900; frame++) {
+  for (let frame = 0; frame < 1500; frame++) {
     simulation.advance(points, 1200, 900, cursor);
     advanceParticle(ambient, 1200, 900);
   }
-  assert.equal(simulation.members.size, 20, '只能吸引已选定的周围粒子');
+  assert.equal(simulation.members.size, 16, '只能吸引已选定的周围粒子');
   const before = [...simulation.members].map((p) => ({ ...p }));
   for (let frame = 0; frame < 1200; frame++) {
     simulation.advance(points, 1200, 900, cursor);
@@ -119,25 +119,26 @@ test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新�
     );
     assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 80);
   }
-  points[20]!.x = cursor.x + 160;
-  points[20]!.y = cursor.y;
-  points[20]!.vx = points[20]!.vy = 0;
+  points[16]!.x = cursor.x + 160;
+  points[16]!.y = cursor.y;
+  points[16]!.vx = points[16]!.vy = 0;
   simulation.advance(points, 1200, 900, { x: cursor.x + 40, y: cursor.y });
   advanceParticle(ambient, 1200, 900);
-  assert.ok(simulation.members.size > 20, '重新移动后应恢复收集');
+  assert.ok(simulation.members.size > 16, '重新移动后应恢复收集');
+  assert.ok(simulation.members.size <= 18, '聚合数量应有限制');
   simulation.advance(points, 1200, 900, null);
   advanceParticle(ambient, 1200, 900);
   assert.equal(simulation.members.size, 0);
   assert.deepEqual(points[0], ambient, '消散后应回到持续运行的背景轨迹');
 });
 
-test('停留后的重排没有快速扩张阶段，最终整圈密度稳定', () => {
+test('密集结点缓慢散开，保留自然间距并停止重排', () => {
   for (const rate of [30, 60, 144]) {
-    const points = Array.from({ length: 24 }, (_, index) => {
+    const points = Array.from({ length: 18 }, (_, index) => {
       const angle =
-        (index < 16 ? 0 : Math.PI) -
+        (index < 12 ? 0 : Math.PI) -
         0.24 +
-        (index < 16 ? index / 15 : (index - 16) / 7) * 0.48;
+        (index < 12 ? index / 11 : (index - 12) / 5) * 0.48;
       return {
         x: cursor.x + Math.cos(angle) * 104,
         y: cursor.y + Math.sin(angle) * 104,
@@ -147,7 +148,7 @@ test('停留后的重排没有快速扩张阶段，最终整圈密度稳定', ()
     });
     const simulation = createParticleSimulation();
     let maximumJump = 0;
-    for (let frame = 0; frame < rate * 15; frame++) {
+    for (let frame = 0; frame < rate * 25; frame++) {
       const before = points.map((p) => ({ ...p }));
       simulation.advance(points, 1200, 900, cursor, 60 / rate);
       for (let index = 0; index < points.length; index++) {
@@ -174,10 +175,8 @@ test('停留后的重排没有快速扩张阶段，最终整圈密度稳定', ()
     const gaps = angles.map(
       (angle, i) => (angles[i + 1] ?? angles[0]! + Math.PI * 2) - angle,
     );
-    assert.ok(
-      Math.max(...gaps) / Math.min(...gaps) < 1.16,
-      '停留后仍存在明显疏密',
-    );
+    assert.ok(Math.max(...gaps) < 0.85, '停留后仍存在大缺口');
+    assert.ok(Math.max(...gaps) / Math.min(...gaps) > 1.2, '不能变成等分轮盘');
     for (let index = 0; index < points.length; index++)
       assert.ok(
         Math.hypot(
@@ -248,14 +247,15 @@ test('稳定线网不与外部粒子连接，周围背景仍独立绘制', () =>
   );
 });
 
-test('较粗的轮廓只连接相邻顶点，多边形闭合并保留向中心的连线', () => {
-  const vertices = [0, 0.4, 0.9, 1.5, 2.1, 3.2, 4.8, 5.5].map((angle) => ({
+test('较粗的三角网按真实距离连线，保留近邻斜边和内圈结点', () => {
+  const vertices = [0, 0.4, 0.7, 1.5, 2.1, 3.2, 4.8, 5.5].map((angle) => ({
     x: cursor.x + Math.cos(angle) * 76,
     y: cursor.y + Math.sin(angle) * 76,
     vx: 0,
     vy: 0,
   }));
   const points = [4, 0, 6, 2, 7, 1, 5, 3].map((index) => vertices[index]!);
+  points.push({ x: cursor.x + 34, y: cursor.y + 10, vx: 0, vy: 0 });
   const edges: {
     from: { x: number; y: number };
     to: { x: number; y: number };
@@ -282,7 +282,7 @@ test('较粗的轮廓只连接相邻顶点，多边形闭合并保留向中心�
   const spokes = edges.filter(
     (edge) => Math.hypot(edge.to.x - cursor.x, edge.to.y - cursor.y) < 1e-8,
   );
-  assert.equal(spokes.length, vertices.length);
+  assert.equal(spokes.length, points.length);
   const key = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     [a, b]
       .map((point) => `${point.x.toFixed(6)},${point.y.toFixed(6)}`)
@@ -292,11 +292,45 @@ test('较粗的轮廓只连接相邻顶点，多边形闭合并保留向中心�
     .filter((edge) => !spokes.includes(edge))
     .map((edge) => key(edge.from, edge.to))
     .sort();
-  const expected = vertices
-    .map((point, index) => key(point, vertices[(index + 1) % vertices.length]!))
-    .sort();
-  assert.deepEqual(outline, expected, '折边应该围成闭合轮廓，不额外画跨圈弦');
+  const expected: string[] = [];
+  for (let i = 0; i < points.length; i++)
+    for (let j = i + 1; j < points.length; j++)
+      if (
+        Math.hypot(points[i]!.x - points[j]!.x, points[i]!.y - points[j]!.y) <
+        56
+      )
+        expected.push(key(points[i]!, points[j]!));
+  assert.deepEqual(
+    outline,
+    expected.sort(),
+    '不能强制闭合远距离顶点或省略近邻斜边',
+  );
+  assert.ok(
+    outline.includes(key(vertices[0]!, vertices[2]!)),
+    '近邻应能组成三角形',
+  );
   assert.ok(widest > 0.5, '轮廓需要比原来的细线更明显');
+});
+
+test('聚合保留内圈的原有位置，不向外撑成同一圆周', () => {
+  const points = [0, 24, 51, 68].map((radius, index) => ({
+    x: cursor.x + Math.cos(index) * radius,
+    y: cursor.y + Math.sin(index) * radius,
+    vx: 0,
+    vy: 0,
+  }));
+  const before = structuredClone(points);
+  const simulation = createParticleSimulation();
+  for (let frame = 0; frame < 1500; frame++)
+    simulation.advance(points, 1200, 900, cursor);
+  for (let index = 0; index < points.length; index++)
+    assert.ok(
+      Math.hypot(
+        points[index]!.x - before[index]!.x,
+        points[index]!.y - before[index]!.y,
+      ) < 1e-8,
+    );
+  assert.ok(simulation.settled);
 });
 
 function largestGap(points: Particle[]) {

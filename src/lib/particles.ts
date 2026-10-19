@@ -18,8 +18,9 @@ interface Position {
 const particleRangeSquared = 6000;
 const cursorRangeSquared = 20000;
 const captureRadius = 320;
-const maximumCapturedParticles = 24;
+const maximumCapturedParticles = 18;
 const collectedRadius = 76;
+const collectedLinkRangeSquared = 56 * 56;
 const gatheringPace = 0.65;
 const frameDuration = 1000 / 60;
 const contentSurfaces =
@@ -81,13 +82,18 @@ function spreadRimParticles(
   step: number,
   settling = 0,
   maximumTurn = 0.016,
+  radiusScale = 1,
+  naturalSpacing = false,
 ) {
   let count = 0;
   for (const point of points) {
     const dx = point.x - cursor.x;
     const dy = point.y - cursor.y;
     const squared = dx * dx + dy * dy;
-    if (squared <= 85 * 85 * (1 - settling) || squared >= cursorRangeSquared)
+    if (
+      squared <= (85 * radiusScale) ** 2 * (1 - settling) ||
+      squared >= cursorRangeSquared
+    )
       continue;
     const sample = rimPool[count] ?? { point, angle: 0, radius: 0 };
     rimPool[count] = sample;
@@ -97,14 +103,16 @@ function spreadRimParticles(
     rimOrder[count++] = sample;
   }
   rimOrder.length = count;
-  if (count < (settling ? 3 : 12)) return;
+  if (count < (naturalSpacing ? 6 : settling ? 3 : 12)) return;
   rimOrder.sort((a, b) => a.angle - b.angle);
   const fullTurn = Math.PI * 2;
   const spacing = fullTurn / count;
-  const minimumSpacing = spacing * (0.9 + 0.05 * settling);
+  const minimumSpacing =
+    spacing * (naturalSpacing ? 0.55 : 0.9 + 0.05 * settling);
   const neighbours = Math.min(8, Math.floor(count / 2));
   const limit =
-    Math.max(0.28, spacing * 1.35) * (1 - settling) + spacing * 1.05 * settling;
+    Math.max(0.28, spacing * (naturalSpacing ? 1.6 : 1.35)) * (1 - settling) +
+    spacing * 1.05 * settling;
   const response = -Math.expm1(-0.09 * step);
   for (let index = 0; index < count; index++) {
     const { point, angle, radius } = rimOrder[index]!;
@@ -133,7 +141,10 @@ function spreadRimParticles(
     const error =
       Math.max(0, ahead - limit) - Math.max(0, behind - limit) + pressure * 0.9;
     if (!error) continue;
-    const inner = Math.max(0, Math.min(1, (radius - 85) / 15));
+    const inner = Math.max(
+      0,
+      Math.min(1, (radius - 85 * radiusScale) / (15 * radiusScale)),
+    );
     const outer = Math.min(1, (Math.sqrt(cursorRangeSquared) - radius) / 12);
     const weight =
       inner *
@@ -181,9 +192,7 @@ function rimTransition(radius: number) {
 export function createParticleSimulation() {
   const members = new Set<Particle>();
   const homes = new Map<Particle, Particle>();
-  const radii = new Map<Particle, number>();
   const group: Particle[] = [];
-  const restingAngles: number[] = [];
   let previous: Position | null = null;
   let motionAnchor: Position | null = null;
   let quietFrames = 0;
@@ -199,7 +208,6 @@ export function createParticleSimulation() {
     }
     members.clear();
     homes.clear();
-    radii.clear();
     previous = motionAnchor = null;
     quietFrames = 0;
     resting = false;
@@ -265,7 +273,7 @@ export function createParticleSimulation() {
       for (let remaining = step; remaining > 0; remaining -= 1) {
         const delta = Math.min(1, remaining);
         if (!moved) quietFrames += delta;
-        const progress = Math.min(1, quietFrames / 90);
+        const progress = Math.min(1, quietFrames / 480);
         const settling = progress * progress * (3 - 2 * progress);
         group.length = 0;
         for (const point of points) {
@@ -279,10 +287,6 @@ export function createParticleSimulation() {
             ) {
               members.add(point);
               homes.set(point, { ...point });
-              radii.set(
-                point,
-                collectedRadius + Math.sin(members.size * 2.399963) * 1.5,
-              );
             } else continue;
           } else {
             point.x += point.vx * delta * (1 - settling) * 0.35;
@@ -291,18 +295,19 @@ export function createParticleSimulation() {
           const x = point.x - cursor.x;
           const y = point.y - cursor.y;
           const radius = Math.hypot(x, y);
-          const target = radii.get(point)!;
+          // Match canvas-nest's soft boundary: only pull inward. Nodes already
+          // inside keep their own positions and drift instead of filling slots.
+          const target = Math.min(radius, collectedRadius);
           // Pull existing nearby nodes in slowly. Never clamp a distant node
           // onto the rim: its changing position must explain every new edge.
           const outer = rimTransition(radius);
-          const speed = (0.22 + 0.58 * outer) * delta * gatheringPace;
-          const response =
-            (0.06 * settling * (1 - outer) + 0.025 * outer) * gatheringPace;
+          const speed = (0.42 + 0.2 * outer) * delta * gatheringPace;
+          const response = 0.025 * gatheringPace;
           const change = Math.max(
             -speed,
             Math.min(speed, (target - radius) * -Math.expm1(-response * delta)),
           );
-          const nextRadius = Math.max(0.01, radius + change);
+          const nextRadius = Math.max(0, radius + change);
           const angle = Math.atan2(y, x);
           point.x = cursor.x + Math.cos(angle) * nextRadius;
           point.y = cursor.y + Math.sin(angle) * nextRadius;
@@ -314,29 +319,17 @@ export function createParticleSimulation() {
           height,
           cursor,
           delta,
-          settling,
-          0.004,
+          0,
+          0.003,
+          collectedRadius / 100,
+          true,
         );
-        if (quietFrames >= 180 && group.length) {
-          restingAngles.length = 0;
-          let ready = true;
-          for (const point of group) {
-            const x = point.x - cursor.x;
-            const y = point.y - cursor.y;
-            if (Math.abs(Math.hypot(x, y) - radii.get(point)!) > 0.15)
-              ready = false;
-            restingAngles.push(Math.atan2(y, x));
-          }
-          restingAngles.sort((a, b) => a - b);
-          const spacing = (Math.PI * 2) / group.length;
-          if (group.length >= 3)
-            for (let index = 0; index < group.length; index++) {
-              const gap =
-                (restingAngles[index + 1] ?? restingAngles[0]! + Math.PI * 2) -
-                restingAngles[index]!;
-              if (gap < spacing * 0.93 || gap > spacing * 1.09) ready = false;
-            }
-          resting = ready;
+        if (quietFrames >= 1200 && group.length) {
+          resting = group.every(
+            (point) =>
+              Math.hypot(point.x - cursor.x, point.y - cursor.y) <
+              collectedRadius + 0.15,
+          );
           if (resting) break;
         }
       }
@@ -349,9 +342,6 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
   const levels = 32;
   const captured: boolean[] = [];
   const nearby: boolean[] = [];
-  const rimIndices: number[] = [];
-  const rimRanks: number[] = [];
-  const rimAngles: number[] = [];
   const buckets = Array.from({ length: levels }, (_, index) => {
     const strength = (index + 0.5) / levels;
     return {
@@ -382,7 +372,6 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#000';
     ctx.globalAlpha = 1;
-    rimIndices.length = 0;
     for (const bucket of buckets) bucket.used = 0;
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
@@ -392,14 +381,7 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
         !!cursor &&
         (point.x - cursor.x) ** 2 + (point.y - cursor.y) ** 2 <
           cursorRangeSquared;
-      if (nearby[i] && cursor) {
-        rimAngles[i] = Math.atan2(point.y - cursor.y, point.x - cursor.x);
-        rimIndices.push(i);
-      }
     }
-    rimIndices.sort((a, b) => rimAngles[a]! - rimAngles[b]!);
-    for (let rank = 0; rank < rimIndices.length; rank++)
-      rimRanks[rimIndices[rank]!] = rank;
     for (let i = 0; i < points.length; i++) {
       const a = points[i]!;
       ctx.fillRect(a.x - 0.5, a.y - 0.5, 1, 1);
@@ -423,15 +405,12 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const distance = dx * dx + dy * dy;
-        let range = particleRangeSquared;
-        if (interaction && nearby[i] && nearby[j]) {
-          // Existing arriving nodes add corners to one closed polygon.
-          // Keep its outline and spokes clear as the vertices approach the rim.
-          const separation = Math.abs(rimRanks[i]! - rimRanks[j]!);
-          if (separation !== 1 && separation !== rimIndices.length - 1)
-            continue;
-          range = 4 * cursorRangeSquared;
-        }
+        // Local distance creates triangles naturally, including diagonals and
+        // inner nodes. No perimeter is drawn across a gap before nodes arrive.
+        const range =
+          interaction && nearby[i] && nearby[j]
+            ? collectedLinkRangeSquared
+            : particleRangeSquared;
         if (distance < range) line(a, b, distance, range);
       }
     }
