@@ -12,11 +12,104 @@ import {
 
 const cursor = { x: 500, y: 450 };
 
-test('周围已有粒子从原位置缓慢靠近，连线只随实际距离建立', () => {
+test('慢启动时先约束附近的外漂，粒子不会在吸力建立前逃走', () => {
+  for (const radius of [150, 170, 180]) {
+    const point = { x: cursor.x + radius, y: cursor.y, vx: 0.6, vy: 0.25 };
+    const simulation = createParticleSimulation();
+    for (let frame = 0; frame < 1200; frame++)
+      simulation.advance([point], 1200, 900, cursor);
+    assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 90);
+  }
+});
+
+test('移动鼠标不会把已经聚合的点整圈拖走', () => {
+  const point = { x: cursor.x + 80, y: cursor.y, vx: 0.1, vy: 0.2 };
+  const simulation = createParticleSimulation();
+  for (let frame = 0; frame < 600; frame++)
+    simulation.advance([point], 1200, 900, cursor);
+  const before = { ...point };
+  simulation.advance([point], 1200, 900, { x: cursor.x + 40, y: cursor.y });
+  assert.ok(
+    Math.hypot(point.x - before.x, point.y - before.y) < 2,
+    '旧圈应从原位置松开，不能随鼠标刚性平移',
+  );
+});
+
+test('释放从当前位置恢复漂移，不瞬移回隐藏的背景轨迹', () => {
+  const point = { x: cursor.x + 180, y: cursor.y, vx: 0.2, vy: 0 };
+  const simulation = createParticleSimulation();
+  for (let frame = 0; frame < 600; frame++)
+    simulation.advance([point], 1200, 900, cursor);
+  const before = { ...point };
+  simulation.advance([point], 1200, 900, null);
+  assert.ok(
+    Math.hypot(point.x - before.x, point.y - before.y) < 2,
+    '释放时出现了位置跳变',
+  );
+  assert.ok(point.x > before.x, '离开吸附区后应恢复原有漂移');
+});
+
+test('鼠标静止时后来进入的真实粒子也会受到吸附', () => {
+  const point = { x: cursor.x + 360, y: cursor.y, vx: -0.8, vy: 0 };
+  const simulation = createParticleSimulation();
+  for (let frame = 0; frame < 600; frame++)
+    simulation.advance([point], 1200, 900, cursor);
+  assert.ok(simulation.members.has(point), '后来进入的点被固定名单排除');
+});
+
+test('长时间停留保留缓慢自然漂移，不锁死成静态图形', () => {
+  const point = { x: cursor.x + 76, y: cursor.y, vx: 0, vy: 0.2 };
+  const simulation = createParticleSimulation();
+  for (let frame = 0; frame < 1500; frame++)
+    simulation.advance([point], 1200, 900, cursor);
+  const before = { ...point };
+  for (let frame = 0; frame < 120; frame++)
+    simulation.advance([point], 1200, 900, cursor);
+  assert.ok(
+    Math.hypot(point.x - before.x, point.y - before.y) > 1,
+    '长时间停留后节点被冻结',
+  );
+});
+
+interface Position {
+  x: number;
+  y: number;
+}
+function canvasRecorder() {
+  let start: Position = { x: 0, y: 0 };
+  const edges: { from: Position; to: Position }[] = [];
+  const calls = { dots: 0, strokes: 0, clears: 0, widest: 0 };
+  const context = {
+    clearRect: () => {
+      calls.clears++;
+      calls.dots = calls.strokes = calls.widest = 0;
+      edges.length = 0;
+    },
+    fillRect: () => {
+      calls.dots++;
+    },
+    beginPath: () => {},
+    moveTo: (x: number, y: number) => {
+      start = { x, y };
+    },
+    lineTo: (x: number, y: number) => {
+      edges.push({ from: start, to: { x, y } });
+    },
+    stroke: () => {
+      calls.strokes++;
+      calls.widest = Math.max(calls.widest, context.lineWidth);
+    },
+  } as unknown as CanvasRenderingContext2D;
+  return { context, calls, edges };
+}
+const same = (a: Position, b: Position) =>
+  Math.hypot(a.x - b.x, a.y - b.y) < 1e-8;
+
+test('周围已有粒子逐个靠近，实际进入范围后才出现中心连线', () => {
   for (const rate of [30, 60, 120, 144]) {
     const points = Array.from({ length: 12 }, (_, index) => {
       const angle = (index / 12) * Math.PI * 2;
-      const radius = 180 + index * 10;
+      const radius = 160 + index * 2;
       return {
         x: cursor.x + Math.cos(angle) * radius,
         y: cursor.y + Math.sin(angle) * radius,
@@ -26,496 +119,248 @@ test('周围已有粒子从原位置缓慢靠近，连线只随实际距离建�
     });
     const originals = [...points];
     const simulation = createParticleSimulation();
+    const recorder = canvasRecorder();
+    const render = createParticleRenderer(recorder.context);
     let spokes = 0;
-    const context = {
-      clearRect: () => {
-        spokes = 0;
-      },
-      fillRect: () => {},
-      beginPath: () => {},
-      moveTo: () => {},
-      stroke: () => {},
-      lineTo: (x: number, y: number) => {
-        if (Math.hypot(x - cursor.x, y - cursor.y) < 1e-8) spokes++;
-      },
-    } as unknown as CanvasRenderingContext2D;
-    const render = createParticleRenderer(context);
     for (let frame = 0; frame < rate * 10; frame++) {
-      const before = points.map((point) => ({ ...point }));
+      const before = structuredClone(points);
       simulation.advance(points, 1200, 900, cursor, 60 / rate);
-      render(points, 1200, 900, cursor, simulation);
-      const nearby = points.filter(
-        (point) =>
-          Math.hypot(point.x - cursor.x, point.y - cursor.y) < Math.sqrt(20000),
+      render(points, 1200, 900, cursor, { step: 60 / rate });
+      const centerEdges = recorder.edges.filter((edge) =>
+        same(edge.to, cursor),
       );
-      assert.equal(
-        spokes,
-        nearby.length,
-        '连接必须由真实距离决定，不能靠计时补出',
-      );
-      if (frame < rate / 2)
-        assert.equal(spokes, 0, '远处粒子尚未靠近时不能凭空连到中心');
-      for (let index = 0; index < points.length; index++) {
-        const point = points[index]!;
-        const old = before[index]!;
-        const travelled =
-          Math.hypot(point.x - old.x, point.y - old.y) / (60 / rate);
-        assert.ok(travelled < 1.25, `粒子从外围瞬移了 ${travelled}px/帧`);
-      }
-      if (frame === rate)
+      spokes = centerEdges.length;
+      for (const edge of centerEdges) {
         assert.ok(
-          Math.hypot(points[0]!.x - cursor.x, points[0]!.y - cursor.y) < 160,
-          '周围已有粒子没有向鼠标靠近',
+          points.some((point) => same(point, edge.from)),
+          '连线必须连接真实粒子',
+        );
+        assert.ok(
+          Math.hypot(edge.from.x - cursor.x, edge.from.y - cursor.y) <
+            Math.sqrt(20000),
+          '粒子进入距离范围前不能连到中心',
+        );
+      }
+      if (frame < rate / 2) assert.equal(spokes, 0, '远处粒子不能凭空连到中心');
+      for (let index = 0; index < points.length; index++)
+        assert.ok(
+          Math.hypot(
+            points[index]!.x - before[index]!.x,
+            points[index]!.y - before[index]!.y,
+          ) /
+            (60 / rate) <
+            1.25,
+          '聚拢不能瞬移',
         );
     }
-    assert.equal(spokes, 12, '选中的周围粒子最终应实际汇入圆周');
+    assert.equal(spokes, 12, '不同距离的周围粒子最终应实际接入线网');
     assert.equal(points.length, originals.length);
     for (let index = 0; index < points.length; index++)
-      assert.equal(points[index], originals[index], '不能新造粒子替换周围粒子');
+      assert.equal(points[index], originals[index]);
+    const beforeReset = structuredClone(points);
     simulation.reset();
-    assert.ok(
-      Math.hypot(points[0]!.x - cursor.x, points[0]!.y - cursor.y) > 179,
-    );
+    assert.deepEqual(points, beforeReset, '清除影响状态不能改变真实位置');
   }
 });
 
-test('移动鼠标时外围粒子从原位置追赶，不随圆心整体平移', () => {
-  const point = { x: cursor.x + 300, y: cursor.y, vx: 0, vy: 0 };
-  const simulation = createParticleSimulation();
-  simulation.advance([point], 1200, 900, cursor);
-  const before = { ...point };
-  simulation.advance([point], 1200, 900, { x: cursor.x + 40, y: cursor.y });
-  assert.ok(Math.hypot(point.x - before.x, point.y - before.y) < 1.25);
-  assert.ok(point.x < before.x, '周围粒子应该实际靠近新位置');
-});
-
-test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新移动可继续收集', () => {
-  const points = Array.from({ length: 24 }, (_, index) => {
-    const angle = (index / 12) * Math.PI * 2;
-    const radius = index < 12 ? 104 : index < 16 ? 240 : 360;
-    const speed = index < 12 ? 0.4 : -0.5;
+test('线条预算不会把后来进入的物理粒子排除在吸附之外', () => {
+  const points = Array.from({ length: 36 }, (_, index) => {
+    const angle = (index / 36) * Math.PI * 2;
     return {
-      x: cursor.x + Math.cos(angle) * radius,
-      y: cursor.y + Math.sin(angle) * radius,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      x: cursor.x + Math.cos(angle) * 160,
+      y: cursor.y + Math.sin(angle) * 160,
+      vx: 0,
+      vy: 0,
     };
   });
   const simulation = createParticleSimulation();
-  const ambient = { ...points[0]! };
-  for (let frame = 0; frame < 1500; frame++) {
+  for (let frame = 0; frame < 600; frame++)
     simulation.advance(points, 1200, 900, cursor);
-    advanceParticle(ambient, 1200, 900);
-  }
-  assert.equal(simulation.members.size, 16, '只能吸引已选定的周围粒子');
-  const before = [...simulation.members].map((p) => ({ ...p }));
-  for (let frame = 0; frame < 1200; frame++) {
-    simulation.advance(points, 1200, 900, cursor);
-    advanceParticle(ambient, 1200, 900);
-  }
-  for (const [index, point] of [...simulation.members].entries()) {
-    assert.ok(
-      Math.hypot(point.x - before[index]!.x, point.y - before[index]!.y) < 0.1,
-    );
-    assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 80);
-  }
-  points[16]!.x = cursor.x + 160;
-  points[16]!.y = cursor.y;
-  points[16]!.vx = points[16]!.vy = 0;
-  simulation.advance(points, 1200, 900, { x: cursor.x + 40, y: cursor.y });
-  advanceParticle(ambient, 1200, 900);
-  assert.ok(simulation.members.size > 16, '重新移动后应恢复收集');
-  assert.ok(simulation.members.size <= 18, '聚合数量应有限制');
-  simulation.advance(points, 1200, 900, null);
-  advanceParticle(ambient, 1200, 900);
-  assert.equal(simulation.members.size, 0);
-  assert.deepEqual(points[0], ambient, '消散后应回到持续运行的背景轨迹');
-});
-
-test('密集结点缓慢散开，保留自然间距并停止重排', () => {
-  for (const rate of [30, 60, 144]) {
-    const points = Array.from({ length: 18 }, (_, index) => {
-      const angle =
-        (index < 12 ? 0 : Math.PI) -
-        0.24 +
-        (index < 12 ? index / 11 : (index - 12) / 5) * 0.48;
-      return {
-        x: cursor.x + Math.cos(angle) * 104,
-        y: cursor.y + Math.sin(angle) * 104,
-        vx: Math.cos(angle) * 0.5,
-        vy: Math.sin(angle) * 0.5,
-      };
-    });
-    const simulation = createParticleSimulation();
-    let maximumJump = 0;
-    for (let frame = 0; frame < rate * 25; frame++) {
-      const before = points.map((p) => ({ ...p }));
-      simulation.advance(points, 1200, 900, cursor, 60 / rate);
-      for (let index = 0; index < points.length; index++) {
-        const point = points[index]!;
-        maximumJump = Math.max(
-          maximumJump,
-          Math.hypot(point.x - before[index]!.x, point.y - before[index]!.y) /
-            (60 / rate),
-        );
-        assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 110);
-      }
-    }
-    assert.ok(
-      maximumJump < 1.25,
-      `出现快速重排 ${maximumJump.toFixed(2)}px/帧`,
-    );
-    assert.ok(simulation.settled, '停留后应结束调整，进入稳定状态');
-    const before = points.map((p) => ({ ...p }));
-    for (let frame = 0; frame < rate * 15; frame++)
-      simulation.advance(points, 1200, 900, cursor, 60 / rate);
-    const angles = points
-      .map((p) => Math.atan2(p.y - cursor.y, p.x - cursor.x))
-      .sort((a, b) => a - b);
-    const gaps = angles.map(
-      (angle, i) => (angles[i + 1] ?? angles[0]! + Math.PI * 2) - angle,
-    );
-    assert.ok(Math.max(...gaps) < 0.85, '停留后仍存在大缺口');
-    assert.ok(Math.max(...gaps) / Math.min(...gaps) > 1.2, '不能变成等分轮盘');
-    for (let index = 0; index < points.length; index++)
-      assert.ok(
-        Math.hypot(
-          points[index]!.x - before[index]!.x,
-          points[index]!.y - before[index]!.y,
-        ) < 0.2,
-        '停留后仍持续变形',
-      );
-  }
-});
-
-test('稳定线网不与外部粒子连接，周围背景仍独立绘制', () => {
-  let start = { x: 0, y: 0 };
-  const edges: {
-    from: { x: number; y: number };
-    to: { x: number; y: number };
-  }[] = [];
-  let dots = 0;
-  const context = {
-    clearRect: () => {
-      edges.length = 0;
-      dots = 0;
-    },
-    fillRect: () => {
-      dots++;
-    },
-    beginPath: () => {},
-    moveTo: (x: number, y: number) => {
-      start = { x, y };
-    },
-    lineTo: (x: number, y: number) => {
-      edges.push({ from: start, to: { x, y } });
-    },
-    stroke: () => {},
-  } as unknown as CanvasRenderingContext2D;
-  const member = { x: cursor.x + 100, y: cursor.y, vx: 0, vy: 0 };
-  const points = [
-    member,
-    ...[150, 190, 200].map((radius) => ({
-      x: cursor.x + radius,
-      y: cursor.y,
-      vx: -0.5,
-      vy: 0,
-    })),
-  ];
-  const render = createParticleRenderer(context);
-  render(points, 1200, 900, null);
-  const ambientEdges = structuredClone(edges);
-  render(points, 1200, 900, cursor, {
-    members: new Set([points[1]!]),
-  });
-  assert.equal(dots, points.length, '开始聚拢不能挖空原有背景');
-  assert.equal(context.globalAlpha, 1, '背景不能随着整组淡入而消失');
-  assert.deepEqual(edges, ambientEdges, '尚未接入的粒子应保留原有连线');
-  render(points, 1200, 900, cursor, {
-    members: new Set([member]),
-  });
-  assert.equal(dots, 4, '附近的独立背景仍然可见');
-  assert.equal(edges.length, 4);
-  assert.equal(edges.filter((edge) => edge.from.x === member.x).length, 1);
-  assert.ok(
-    edges.some((edge) => edge.from.x === member.x && edge.to.x === cursor.x),
+  assert.equal(
+    simulation.members.size,
+    points.length,
+    '范围内不能存在固定名单外节点',
   );
+  for (const point of points)
+    assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 85);
+  const recorder = canvasRecorder();
+  const render = createParticleRenderer(recorder.context);
+  for (let frame = 0; frame < 60; frame++) render(points, 1200, 900, cursor);
+  const spokes = recorder.edges.filter((edge) => same(edge.to, cursor));
+  assert.ok(spokes.length > 0 && spokes.length <= 18);
   assert.ok(
-    edges.some(
-      (edge) => edge.from.x === cursor.x + 190 && edge.to.x === cursor.x + 200,
-    ),
+    spokes.some((edge) => edge.from.x < cursor.x) &&
+      spokes.some((edge) => edge.from.x > cursor.x),
+    '中心线应覆盖左右两侧',
   );
 });
 
-test('较粗的三角网按真实距离连线，保留近邻斜边和内圈结点', () => {
-  const vertices = [0, 0.4, 0.7, 1.5, 2.1, 3.2, 4.8, 5.5].map((angle) => ({
-    x: cursor.x + Math.cos(angle) * 76,
-    y: cursor.y + Math.sin(angle) * 76,
-    vx: 0,
+test('外部近邻接入同一线网，不被成员分组隔离', () => {
+  const points = [100, 150, 190, 200].map((radius) => ({
+    x: cursor.x + radius,
+    y: cursor.y,
+    vx: -0.5,
     vy: 0,
   }));
-  const points = [4, 0, 6, 2, 7, 1, 5, 3].map((index) => vertices[index]!);
-  points.push({ x: cursor.x + 34, y: cursor.y + 10, vx: 0, vy: 0 });
-  const edges: {
-    from: { x: number; y: number };
-    to: { x: number; y: number };
-  }[] = [];
-  let start = cursor;
-  let widest = 0;
-  const context = {
-    clearRect: () => {},
-    fillRect: () => {},
-    beginPath: () => {},
-    moveTo: (x: number, y: number) => {
-      start = { x, y };
-    },
-    lineTo: (x: number, y: number) => {
-      edges.push({ from: start, to: { x, y } });
-    },
-    stroke: () => {
-      widest = Math.max(widest, context.lineWidth);
-    },
-  } as unknown as CanvasRenderingContext2D;
-  createParticleRenderer(context)(points, 1200, 900, cursor, {
-    members: new Set(points),
-  });
-  const spokes = edges.filter(
-    (edge) => Math.hypot(edge.to.x - cursor.x, edge.to.y - cursor.y) < 1e-8,
-  );
-  assert.equal(spokes.length, points.length);
-  const key = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-    [a, b]
-      .map((point) => `${point.x.toFixed(6)},${point.y.toFixed(6)}`)
-      .sort()
-      .join('|');
-  const outline = edges
-    .filter((edge) => !spokes.includes(edge))
-    .map((edge) => key(edge.from, edge.to))
-    .sort();
-  const expected: string[] = [];
-  for (let i = 0; i < points.length; i++)
-    for (let j = i + 1; j < points.length; j++)
-      if (
-        Math.hypot(points[i]!.x - points[j]!.x, points[i]!.y - points[j]!.y) <
-        56
-      )
-        expected.push(key(points[i]!, points[j]!));
-  assert.deepEqual(
-    outline,
-    expected.sort(),
-    '不能强制闭合远距离顶点或省略近邻斜边',
-  );
+  const recorder = canvasRecorder();
+  const render = createParticleRenderer(recorder.context);
+  for (let frame = 0; frame < 60; frame++) render(points, 1200, 900, cursor);
+  const joined = (a: Particle, b: Particle) =>
+    recorder.edges.some(
+      (edge) =>
+        (same(edge.from, a) && same(edge.to, b)) ||
+        (same(edge.from, b) && same(edge.to, a)),
+    );
+  assert.equal(recorder.calls.dots, points.length, '聚拢不能挖空背景');
+  assert.equal(recorder.context.globalAlpha, 1);
+  assert.ok(joined(points[0]!, points[1]!), '吸附范围的节点应保留外部近邻连接');
+  assert.ok(joined(points[2]!, points[3]!));
   assert.ok(
-    outline.includes(key(vertices[0]!, vertices[2]!)),
-    '近邻应能组成三角形',
+    recorder.edges.some(
+      (edge) => same(edge.from, points[0]!) && same(edge.to, cursor),
+    ),
   );
-  assert.ok(widest > 0.5, '轮廓需要比原来的细线更明显');
+  render(points, 1200, 900, null);
+  assert.equal(
+    recorder.edges.filter((edge) => same(edge.to, cursor)).length,
+    0,
+  );
+  assert.ok(joined(points[0]!, points[1]!), '释放影响后仍应绘制真实背景近邻');
 });
 
-test('聚合保留内圈的原有位置，不向外撑成同一圆周', () => {
+test('较粗的局部三角网保留斜边和内圈，不跨越远距离强制闭合', () => {
+  const points = [
+    { x: 576, y: 450, vx: 0, vy: 0 },
+    { x: 570, y: 470, vx: 0, vy: 0 },
+    { x: 565, y: 485, vx: 0, vy: 0 },
+    { x: 534, y: 460, vx: 0, vy: 0 },
+    { x: 424, y: 450, vx: 0, vy: 0 },
+  ];
+  const recorder = canvasRecorder();
+  const render = createParticleRenderer(recorder.context);
+  for (let frame = 0; frame < 60; frame++) render(points, 1200, 900, cursor);
+  const joined = (a: Particle, b: Particle) =>
+    recorder.edges.some(
+      (edge) =>
+        (same(edge.from, a) && same(edge.to, b)) ||
+        (same(edge.from, b) && same(edge.to, a)),
+    );
+  assert.ok(
+    joined(points[0]!, points[1]!) &&
+      joined(points[1]!, points[2]!) &&
+      joined(points[0]!, points[2]!),
+    '真实近邻应形成三角形',
+  );
+  assert.ok(joined(points[0]!, points[3]!), '内圈节点应接入近邻');
+  assert.ok(!joined(points[0]!, points[4]!), '不能为补全轮廓跨越远距离缺口');
+  assert.ok(recorder.calls.widest > 1, '短边需要呈现加粗后的线宽');
+});
+
+test('内圈静止点保留原位置，有速度的点保留自然漂移', () => {
   const points = [0, 24, 51, 68].map((radius, index) => ({
     x: cursor.x + Math.cos(index) * radius,
     y: cursor.y + Math.sin(index) * radius,
     vx: 0,
     vy: 0,
   }));
-  const before = structuredClone(points);
   const simulation = createParticleSimulation();
-  for (let frame = 0; frame < 1500; frame++)
-    simulation.advance(points, 1200, 900, cursor);
-  for (let index = 0; index < points.length; index++)
-    assert.ok(
-      Math.hypot(
-        points[index]!.x - before[index]!.x,
-        points[index]!.y - before[index]!.y,
-      ) < 1e-8,
-    );
-  assert.ok(simulation.settled);
-});
-
-function largestGap(points: Particle[]) {
-  const angles = points
-    .map((point) => Math.atan2(point.y - cursor.y, point.x - cursor.x))
-    .sort((a, b) => a - b);
-  return Math.max(
-    ...angles.map(
-      (angle, index) => (angles[index + 1] ?? angles[0]! + Math.PI * 2) - angle,
-    ),
-  );
-}
-
-test('两处密集堆积会逐渐散开，不长期挤在两个点上', () => {
-  for (const rate of [30, 60, 144]) {
-    const points = Array.from({ length: 64 }, (_, index) => {
-      const group = index < 48 ? 0 : Math.PI;
-      const offset = index < 48 ? index / 47 : (index - 48) / 15;
-      const angle = group - 0.24 + offset * 0.48;
-      const speed = 0.3 + (index % 5) * 0.05;
-      return {
-        x: cursor.x + Math.cos(angle) * 104,
-        y: cursor.y + Math.sin(angle) * 104,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-      };
-    });
-    function concentration() {
-      const angles = points.map((p) =>
-        Math.atan2(p.y - cursor.y, p.x - cursor.x),
-      );
-      const peaks =
-        Math.hypot(
-          angles.reduce((sum, angle) => sum + Math.cos(2 * angle), 0),
-          angles.reduce((sum, angle) => sum + Math.sin(2 * angle), 0),
-        ) / points.length;
-      const sideBias =
-        Math.hypot(
-          angles.reduce((sum, angle) => sum + Math.cos(angle), 0),
-          angles.reduce((sum, angle) => sum + Math.sin(angle), 0),
-        ) / points.length;
-      const largestCrowd = Math.max(
-        ...angles.map(
-          (start) =>
-            angles.filter(
-              (angle) =>
-                (angle - start + Math.PI * 2) % (Math.PI * 2) < Math.PI / 6,
-            ).length,
-        ),
-      );
-      return { peaks, sideBias, largestCrowd };
-    }
-    assert.ok(concentration().peaks > 0.9);
-    for (let frame = 0; frame < rate * 10; frame++)
-      advanceParticles(points, 1200, 900, cursor, 60 / rate);
-    let result = concentration();
-    assert.ok(result.peaks < 0.35, `双点聚集程度 ${result.peaks.toFixed(2)}`);
-    assert.ok(
-      result.sideBias < 0.16,
-      `整半圈仍偏密：${result.sideBias.toFixed(2)}`,
-    );
-    assert.ok(
-      result.largestCrowd <= 9,
-      `30° 内仍挤了 ${result.largestCrowd} 个粒子`,
-    );
-    for (let frame = 0; frame < rate * 20; frame++)
-      advanceParticles(points, 1200, 900, cursor, 60 / rate);
-    result = concentration();
-    assert.ok(
-      result.peaks < 0.25,
-      `长期停留又聚集到两个点：${result.peaks.toFixed(2)}`,
-    );
-    assert.ok(
-      result.sideBias < 0.16,
-      `长期停留后半圈偏密：${result.sideBias.toFixed(2)}`,
-    );
-    assert.ok(
-      result.largestCrowd <= 9,
-      `长期停留后 30° 内挤了 ${result.largestCrowd} 个粒子`,
-    );
-  }
-});
-
-test('鼠标停留后顶部大缺口会收拢，过渡连续且保留自然间距', () => {
-  for (const rate of [30, 60, 120, 144]) {
-    const points = Array.from({ length: 48 }, (_, index) => {
-      const angle = -Math.PI / 2 + 0.75 + (index / 47) * (Math.PI * 2 - 1.5);
-      const speed = 0.3 + (index % 5) * 0.08;
-      return {
-        x: cursor.x + Math.cos(angle) * 104,
-        y: cursor.y + Math.sin(angle) * 104,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-      };
-    });
-    assert.ok(largestGap(points) > 1.4);
-    let maximumSpeed = 0;
-    for (let frame = 0; frame < rate * 6; frame++) {
-      const before = points.map((point) => ({ ...point }));
-      advanceParticles(points, 1200, 900, cursor, 60 / rate);
-      for (let index = 0; index < points.length; index++)
-        maximumSpeed = Math.max(
-          maximumSpeed,
-          Math.hypot(
-            points[index]!.x - before[index]!.x,
-            points[index]!.y - before[index]!.y,
-          ) /
-            (60 / rate),
-        );
-    }
-    assert.ok(
-      largestGap(points) < 0.4,
-      `${rate}Hz 顶部仍缺 ${((largestGap(points) * 180) / Math.PI).toFixed(1)}°`,
-    );
-    assert.ok(maximumSpeed < 3, `${rate}Hz 出现瞬移 ${maximumSpeed}px/帧`);
-    const released = { ...points[0]! };
-    advanceParticles(points, 1200, 900, null);
-    assert.equal(points[0]!.x, released.x + released.vx);
-    assert.equal(points[0]!.y, released.y + released.vy);
-  }
-});
-
-test('没有大缺口的自然间距不被重新等分', () => {
-  const points = Array.from({ length: 24 }, (_, index) => {
-    const angle = (index / 24) * Math.PI * 2 + (index % 3) * 0.012;
-    return {
-      x: cursor.x + Math.cos(angle) * (102 + (index % 5)),
-      y: cursor.y + Math.sin(angle) * (102 + (index % 5)),
-      vx: 0,
-      vy: 0,
-    };
-  });
-  const angles = points.map((p) => Math.atan2(p.y - cursor.y, p.x - cursor.x));
-  for (let frame = 0; frame < 360; frame++)
-    advanceParticles(points, 1200, 900, cursor);
-  for (let index = 0; index < points.length; index++) {
-    const angle = Math.atan2(
-      points[index]!.y - cursor.y,
-      points[index]!.x - cursor.x,
-    );
-    assert.ok(Math.abs(angle - angles[index]!) < 1e-8);
-  }
-});
-
-test('内圈保留自然位置和独立漂移，不强制排列成等距圆环', () => {
-  const points: Particle[] = [
-    { x: 450, y: 450, vx: 0, vy: 0 },
-    { x: 445, y: 460, vx: 0, vy: 0 },
-    { x: 480, y: 380, vx: 0, vy: 0 },
-    { x: 520, y: 510, vx: 0, vy: 0 },
-  ];
   const before = structuredClone(points);
-  for (let frame = 0; frame < 60; frame++)
-    advanceParticles(points, 1200, 900, cursor);
-  assert.deepEqual(points, before);
-  for (const point of points) {
-    point.vx = 0.2;
-    point.vy = -0.3;
-  }
-  advanceParticles(points, 1200, 900, cursor);
-  for (let index = 0; index < points.length; index++) {
-    assert.equal(points[index]!.x, before[index]!.x + 0.2);
-    assert.equal(points[index]!.y, before[index]!.y - 0.3);
-  }
+  for (let frame = 0; frame < 600; frame++)
+    simulation.advance(points, 1200, 900, cursor);
+  assert.deepEqual(points, before, '静止内圈节点不能被撑到统一圆周');
+  points[1]!.vx = 0.2;
+  points[1]!.vy = -0.3;
+  simulation.advance(points, 1200, 900, cursor);
+  assert.ok(points[1]!.x > before[1]!.x && points[1]!.y < before[1]!.y);
 });
 
-test('鼠标靠近画布边缘时，聚拢粒子保持有效坐标', () => {
-  const edge = { x: 0, y: 400 };
-  const points = Array.from({ length: 48 }, (_, index) => {
-    const angle = -1.45 + (index / 47) * 2.9;
-    return {
-      x: Math.cos(angle) * 104,
-      y: edge.y + Math.sin(angle) * 104,
-      vx: 0.7,
-      vy: 0.3,
-    };
-  });
-  for (let frame = 0; frame < 360; frame++)
-    advanceParticles(points, 1200, 900, edge);
-  for (const point of points) {
-    assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y));
-    assert.ok(
-      point.x >= -1 && point.x <= 1201 && point.y >= -1 && point.y <= 901,
-    );
+test('吸附的内外边界连续启停，远处保持自由运动', () => {
+  for (const radius of [76, 220]) {
+    const displacements = [-0.001, 0.001].map((offset) => {
+      const point = {
+        x: cursor.x + radius + offset,
+        y: cursor.y,
+        vx: 0,
+        vy: 0,
+      };
+      const before = point.x;
+      attractParticle(point, cursor);
+      return point.x - before;
+    });
+    assert.ok(Math.abs(displacements[0]! - displacements[1]!) < 0.001);
   }
+  const point = { x: cursor.x + 260, y: cursor.y, vx: 0.4, vy: -0.3 };
+  advanceParticles([point], 1200, 900, cursor);
+  assert.equal(point.x, cursor.x + 260.4);
+  assert.equal(point.y, cursor.y - 0.3);
+});
+
+test('朝外漂移的周围粒子被缓慢拉入，释放后恢复原有速度', () => {
+  const point = { x: cursor.x + 130, y: cursor.y, vx: 1, vy: 0 };
+  for (let frame = 0; frame < 600; frame++)
+    advanceParticles([point], 1200, 900, cursor);
+  assert.ok(point.x - cursor.x < 85, '吸附应能克服范围内的朝外漂移');
+  assert.equal(point.vx, 1);
+  const before = { ...point };
+  advanceParticles([point], 1200, 900, null);
+  assert.equal(point.x, before.x + 1);
+});
+
+test('不同刷新率下的聚拢与鼠标移动响应一致', () => {
+  function simulate(rate: number) {
+    const points = [
+      { x: cursor.x + 180, y: cursor.y, vx: 0.6, vy: 0.25 },
+      { x: cursor.x - 145, y: cursor.y - 20, vx: -0.4, vy: 0.3 },
+    ];
+    const simulation = createParticleSimulation();
+    for (let frame = 0; frame < rate * 8; frame++)
+      simulation.advance(points, 1200, 900, cursor, 60 / rate);
+    for (let frame = 0; frame < rate * 2; frame++) {
+      const progress = Math.min(1, (frame + 1) / (rate / 2));
+      simulation.advance(
+        points,
+        1200,
+        900,
+        { x: cursor.x + 40 * progress, y: cursor.y + 20 * progress },
+        60 / rate,
+      );
+    }
+    return points;
+  }
+  const reference = simulate(60);
+  for (const rate of [30, 120, 144])
+    for (const [index, point] of simulate(rate).entries())
+      assert.ok(
+        Math.hypot(
+          point.x - reference[index]!.x,
+          point.y - reference[index]!.y,
+        ) < 1,
+        rate + 'Hz 运动偏离',
+      );
+});
+
+test('视口边缘连续反弹，中心重合和零时长不会产生 NaN', () => {
+  const point: Particle = { x: 99.5, y: 0.5, vx: 1, vy: -1 };
+  advanceParticle(point, 100, 100);
+  assert.equal(point.vx, -1);
+  assert.equal(point.vy, 1);
+  advanceParticle(point, 100, 100);
+  assert.equal(point.x, 99.5);
+  assert.equal(point.y, 0.5);
+  const before = { ...point };
+  advanceParticles([point], 100, 100, cursor, 0);
+  assert.deepEqual(point, before);
+  attractParticle(point, { x: point.x, y: point.y });
+  assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y));
+  const edge = { x: 2, y: 2, vx: -1, vy: -1 };
+  for (let frame = 0; frame < 600; frame++)
+    advanceParticles([edge], 1200, 900, { x: 0, y: 0 });
+  assert.ok(
+    edge.x >= -1 &&
+      edge.y >= -1 &&
+      Number.isFinite(edge.x) &&
+      Number.isFinite(edge.y),
+  );
 });
 
 test('鼠标跟随按时间平滑补齐事件间隔，松开后立即清除', () => {
@@ -545,135 +390,37 @@ test('鼠标跟随在不同刷新率下具有相同响应时间', () => {
     );
 });
 
-test('粒子停留在圆形边缘时不会反复发生像素级跳变', () => {
-  const point: Particle = { x: 600, y: 450, vx: 0.6, vy: 0 };
-  for (let frame = 0; frame < 300; frame++)
-    advanceParticles([point], 1200, 900, cursor);
-  let maximumJump = 0;
-  for (let frame = 0; frame < 120; frame++) {
-    const before = point.x;
-    advanceParticles([point], 1200, 900, cursor);
-    maximumJump = Math.max(maximumJump, Math.abs(point.x - before));
-  }
-  assert.ok(maximumJump < 0.15, `停留时最大跳变 ${maximumJump.toFixed(2)}px`);
-  assert.ok(point.x - cursor.x >= 100 && point.x - cursor.x < 112);
-});
-
-test('内圈和远处自由漂移，外圈逐渐收拢', () => {
-  for (const radius of [0, 70, 99, 100, 142, 200]) {
-    const point: Particle = { x: cursor.x + radius, y: cursor.y, vx: 0, vy: 0 };
-    const before = { ...point };
-    attractParticle(point, cursor);
-    assert.deepEqual(point, before);
-  }
-  for (const radius of [100.001, 105, 120, 130, 141]) {
-    const point: Particle = { x: cursor.x + radius, y: cursor.y, vx: 0, vy: 0 };
-    attractParticle(point, cursor);
-    assert.ok(point.x < cursor.x + radius);
-    assert.ok(point.x > cursor.x + 100);
-  }
-});
-
-test('吸引力在内外边界平滑启停', () => {
-  for (const radius of [100, Math.sqrt(20000)]) {
-    const displacements = [-0.001, 0.001].map((offset) => {
-      const point: Particle = {
-        x: cursor.x + radius + offset,
-        y: cursor.y,
-        vx: 0,
-        vy: 0,
-      };
-      const before = point.x;
-      attractParticle(point, cursor);
-      return point.x - before;
-    });
-    assert.ok(Math.abs(displacements[0]! - displacements[1]!) < 0.001);
-  }
-});
-
-test('持续吸引保留圆形范围和自由漂移，移动鼠标后无瞬移', () => {
-  const point: Particle = { x: 620, y: 450, vx: 0.6, vy: 0.2 };
-  for (let frame = 0; frame < 600; frame++) {
-    advanceParticles([point], 1200, 900, cursor);
-    assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 142);
-  }
-  assert.deepEqual({ vx: point.vx, vy: point.vy }, { vx: 0.6, vy: 0.2 });
-  const beforeMove = { ...point };
-  advanceParticles([point], 1200, 900, { x: 540, y: 470 });
-  assert.ok(Math.hypot(point.x - beforeMove.x, point.y - beforeMove.y) < 5);
-  const beforeRelease = { ...point };
-  advanceParticles([point], 1200, 900, null);
-  assert.equal(point.x, beforeRelease.x + 0.6);
-  assert.equal(point.y, beforeRelease.y + 0.2);
-});
-
-test('不同刷新率下移动速度和圆形聚拢范围一致', () => {
-  function simulate(rate: number) {
-    const point: Particle = { x: 620, y: 450, vx: 0.6, vy: 0.25 };
-    for (let frame = 0; frame < rate * 8; frame++)
-      advanceParticles([point], 1200, 900, cursor, 60 / rate);
-    return point;
-  }
-  const reference = simulate(60);
-  for (const rate of [30, 120, 144]) {
-    const point = simulate(rate);
-    assert.ok(
-      Math.hypot(point.x - reference.x, point.y - reference.y) < 1,
-      `${rate}Hz 运动偏离`,
-    );
-  }
-});
-
-test('视口边界反弹，零时长更新不会移动或产生 NaN', () => {
-  const point: Particle = { x: 99.5, y: 0.5, vx: 1, vy: -1 };
-  advanceParticle(point, 100, 100);
-  assert.equal(point.vx, -1);
-  assert.equal(point.vy, 1);
-  advanceParticle(point, 100, 100);
-  assert.equal(point.x, 99.5);
-  assert.equal(point.y, 0.5);
-  const before = { ...point };
-  advanceParticles([point], 100, 100, cursor, 0);
-  assert.deepEqual(point, before);
-  attractParticle(point, { x: point.x, y: point.y });
-  assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y));
-});
-
-test('密集线网完整绘制且最多描边 32 次，重绘不会修改运动状态或残留旧线', () => {
-  const calls = { strokes: 0, edges: 0, clears: 0, dots: 0 };
-  const context = {
-    clearRect: () => {
-      calls.clears++;
-      calls.strokes = calls.edges = calls.dots = 0;
-    },
-    fillRect: () => {
-      calls.dots++;
-    },
-    beginPath: () => {},
-    moveTo: () => {},
-    lineTo: () => {
-      calls.edges++;
-    },
-    stroke: () => {
-      calls.strokes++;
-    },
-  } as unknown as CanvasRenderingContext2D;
+test('密集线网保持有界边数和批量描边，重绘不改变粒子或残留旧线', () => {
+  const recorder = canvasRecorder();
   const points = Array.from({ length: 120 }, (_, index) => ({
-    x: cursor.x + ((index % 11) - 5) * 2,
-    y: cursor.y + (Math.floor(index / 11) - 4) * 2,
+    x: cursor.x + ((index % 11) - 5) * 2 + 0.3,
+    y: cursor.y + (Math.floor(index / 11) - 4) * 2 + 0.7,
     vx: 0.6,
     vy: 0.2,
   }));
   const before = structuredClone(points);
-  const render = createParticleRenderer(context);
-  render(points, 1200, 900, cursor);
-  assert.equal(calls.clears, 1);
-  assert.equal(calls.dots, 120);
-  assert.equal(calls.edges, (120 * 119) / 2 + 120);
-  assert.ok(calls.strokes > 0 && calls.strokes <= 32);
-  assert.deepEqual(points, before, '绘制不能顺带推进运动状态');
+  const render = createParticleRenderer(recorder.context);
+  for (let frame = 0; frame < 60; frame++) render(points, 1200, 900, cursor);
+  const spokes = recorder.edges.filter((edge) => same(edge.to, cursor));
+  const key = (a: Position, b: Position) =>
+    [a, b]
+      .map((p) => p.x + ',' + p.y)
+      .sort()
+      .join('|');
+  assert.equal(recorder.calls.dots, points.length);
+  assert.ok(spokes.length <= 18);
+  assert.ok(
+    recorder.edges.length > 0 &&
+      recorder.edges.length <= points.length * 3 + 18,
+  );
+  assert.equal(
+    new Set(recorder.edges.map((edge) => key(edge.from, edge.to))).size,
+    recorder.edges.length,
+    '无向边不能重复加深',
+  );
+  assert.ok(recorder.calls.strokes > 0 && recorder.calls.strokes <= 32);
+  assert.deepEqual(points, before, '绘制不能推进运动状态');
   render([{ x: 1, y: 1, vx: 0, vy: 0 }], 1200, 900, cursor);
-  assert.equal(calls.clears, 2);
-  assert.equal(calls.edges, 0);
-  assert.equal(calls.strokes, 0);
+  assert.equal(recorder.edges.length, 0);
+  assert.equal(recorder.calls.strokes, 0);
 });

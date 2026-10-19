@@ -17,14 +17,17 @@ interface Position {
 
 const particleRangeSquared = 6000;
 const cursorRangeSquared = 20000;
-const captureRadius = 320;
-const maximumCapturedParticles = 18;
+const captureRadius = 220;
 const collectedRadius = 76;
-const collectedLinkRangeSquared = 56 * 56;
-const gatheringPace = 0.65;
+const maximumSpokes = 18;
 const frameDuration = 1000 / 60;
 const contentSurfaces =
   '.article-card, .project-card, .hero, .side-panel, .article-paper, .paper, .toc, .empty-state, .topic-card, .archive-row, .search-container, img, video, a, button, input, textarea, select, [data-background-static]';
+
+function influence(radius: number) {
+  const t = Math.max(0, Math.min(1, (captureRadius - radius) / 32));
+  return t * t * (3 - 2 * t);
+}
 
 export function followCursor(
   current: Position | null,
@@ -32,8 +35,7 @@ export function followCursor(
   step = 1,
 ) {
   if (!target) return null;
-  if (!current) return { x: target.x, y: target.y };
-  // Bridge gaps between input events with a short, time-based 12ms response.
+  if (!current) return { ...target };
   const blend = -Math.expm1((-frameDuration * step) / 12);
   current.x += (target.x - current.x) * blend;
   current.y += (target.y - current.y) * blend;
@@ -48,123 +50,26 @@ export function advanceParticle(
 ) {
   p.x += p.vx * step;
   p.y += p.vy * step;
-  if (p.x < 0 || p.x > width) p.vx *= -1;
-  if (p.y < 0 || p.y > height) p.vy *= -1;
+  if ((p.x < 0 && p.vx < 0) || (p.x > width && p.vx > 0)) p.vx *= -1;
+  if ((p.y < 0 && p.vy < 0) || (p.y > height && p.vy > 0)) p.vy *= -1;
 }
 
 export function attractParticle(p: Particle, cursor: Position, step = 1) {
   const dx = p.x - cursor.x;
   const dy = p.y - cursor.y;
-  const distanceSquared = dx * dx + dy * dy;
-  // Keep the reference's circular capture area, with a continuous restoring force.
-  // The original 3% jump switches on at 100px and makes settled points jitter.
-  if (
-    distanceSquared < cursorRangeSquared &&
-    distanceSquared > cursorRangeSquared / 2
-  ) {
-    const distance = Math.sqrt(distanceSquared);
-    const edge = Math.min(1, (Math.sqrt(cursorRangeSquared) - distance) / 12);
-    const falloff = edge * edge * (3 - 2 * edge);
-    const pull = (1 - 100 / distance) * -Math.expm1(-0.12 * step * falloff);
-    p.x -= dx * pull;
-    p.y -= dy * pull;
-  }
-  return distanceSquared;
-}
-
-const rimPool: { point: Particle; angle: number; radius: number }[] = [];
-const rimOrder: (typeof rimPool)[number][] = [];
-function spreadRimParticles(
-  points: Particle[],
-  width: number,
-  height: number,
-  cursor: Position,
-  step: number,
-  settling = 0,
-  maximumTurn = 0.016,
-  radiusScale = 1,
-  naturalSpacing = false,
-) {
-  let count = 0;
-  for (const point of points) {
-    const dx = point.x - cursor.x;
-    const dy = point.y - cursor.y;
-    const squared = dx * dx + dy * dy;
-    if (
-      squared <= (85 * radiusScale) ** 2 * (1 - settling) ||
-      squared >= cursorRangeSquared
-    )
-      continue;
-    const sample = rimPool[count] ?? { point, angle: 0, radius: 0 };
-    rimPool[count] = sample;
-    sample.point = point;
-    sample.angle = Math.atan2(dy, dx);
-    sample.radius = Math.sqrt(squared);
-    rimOrder[count++] = sample;
-  }
-  rimOrder.length = count;
-  if (count < (naturalSpacing ? 6 : settling ? 3 : 12)) return;
-  rimOrder.sort((a, b) => a.angle - b.angle);
-  const fullTurn = Math.PI * 2;
-  const spacing = fullTurn / count;
-  const minimumSpacing =
-    spacing * (naturalSpacing ? 0.55 : 0.9 + 0.05 * settling);
-  const neighbours = Math.min(8, Math.floor(count / 2));
-  const limit =
-    Math.max(0.28, spacing * (naturalSpacing ? 1.6 : 1.35)) * (1 - settling) +
-    spacing * 1.05 * settling;
-  const response = -Math.expm1(-0.09 * step);
-  for (let index = 0; index < count; index++) {
-    const { point, angle, radius } = rimOrder[index]!;
-    const previous = rimOrder[(index + count - 1) % count]!.angle;
-    const next = rimOrder[(index + 1) % count]!.angle;
-    const behind = angle - previous + (index === 0 ? fullTurn : 0);
-    const ahead = next - angle + (index === count - 1 ? fullTurn : 0);
-    let pressure = 0;
-    // Share crowding pressure across a few neighbours so dense knots can open up.
-    // This leaves a range of natural spacings instead of assigning angular slots.
-    for (let offset = 1; offset <= neighbours; offset++) {
-      const previousIndex = index - offset;
-      const nextIndex = index + offset;
-      const behindSpan =
-        angle -
-        rimOrder[(previousIndex + count) % count]!.angle +
-        (previousIndex < 0 ? fullTurn : 0);
-      const aheadSpan =
-        rimOrder[nextIndex % count]!.angle -
-        angle +
-        (nextIndex >= count ? fullTurn : 0);
-      const spacing = minimumSpacing * offset;
-      pressure +=
-        Math.max(0, spacing - behindSpan) - Math.max(0, spacing - aheadSpan);
-    }
-    const error =
-      Math.max(0, ahead - limit) - Math.max(0, behind - limit) + pressure * 0.9;
-    if (!error) continue;
-    const inner = Math.max(
-      0,
-      Math.min(1, (radius - 85 * radiusScale) / (15 * radiusScale)),
-    );
-    const outer = Math.min(1, (Math.sqrt(cursorRangeSquared) - radius) / 12);
-    const weight =
-      inner *
-        inner *
-        (3 - 2 * inner) *
-        outer *
-        outer *
-        (3 - 2 * outer) *
-        (1 - settling) +
-      settling;
-    const speed = (maximumTurn * (1 - settling) + 0.004 * settling) * step;
-    const turn = Math.max(-speed, Math.min(speed, error * response)) * weight;
-    const x = cursor.x + Math.cos(angle + turn) * radius;
-    const y = cursor.y + Math.sin(angle + turn) * radius;
-    // Let a settling mesh extend past the viewport; the canvas clips its edge.
-    if (settling || (x >= 0 && x <= width && y >= 0 && y <= height)) {
-      point.x = x;
-      point.y = y;
-    }
-  }
+  const squared = dx * dx + dy * dy;
+  const radius = Math.sqrt(squared);
+  if (radius <= collectedRadius || radius >= captureRadius) return squared;
+  // A continuous, bounded inward force acts on every nearby real particle.
+  // Interior nodes keep drifting; no circle slots, cohort lock or position snap.
+  const pull =
+    Math.min(
+      0.24 * step,
+      (radius - collectedRadius) * -Math.expm1(-0.06 * step),
+    ) * influence(radius);
+  p.x -= (dx / radius) * pull;
+  p.y -= (dy / radius) * pull;
+  return squared;
 }
 
 export function advanceParticles(
@@ -173,53 +78,40 @@ export function advanceParticles(
   height: number,
   cursor: Position | null,
   step = 1,
+  strength = 1,
 ) {
   for (let remaining = step; remaining > 0; remaining -= 1) {
     const delta = Math.min(remaining, 1);
     for (const point of points) {
-      advanceParticle(point, width, height, delta);
-      if (cursor) attractParticle(point, cursor, delta);
+      const weight = cursor
+        ? influence(Math.hypot(point.x - cursor.x, point.y - cursor.y)) *
+          Math.min(1, strength * 6)
+        : 0;
+      // Slow the original drift inside the field so outward velocity cannot
+      // overpower attraction while the inward pull is still building. Braking
+      // engages sooner than gathering; release restores the original drift.
+      advanceParticle(point, width, height, delta * (1 - 0.88 * weight));
+      if (cursor) attractParticle(point, cursor, delta * strength);
     }
-    if (cursor) spreadRimParticles(points, width, height, cursor, delta);
   }
-}
-
-function rimTransition(radius: number) {
-  const progress = Math.max(0, Math.min(1, (radius - 110) / 70));
-  return progress * progress * (3 - 2 * progress);
 }
 
 export function createParticleSimulation() {
   const members = new Set<Particle>();
-  const homes = new Map<Particle, Particle>();
-  const group: Particle[] = [];
-  let previous: Position | null = null;
-  let motionAnchor: Position | null = null;
-  let quietFrames = 0;
-  let resting = false;
-  let bounds = { width: 0, height: 0 };
-
+  let center: Position | null = null;
+  let strength = 0;
   function reset() {
-    for (const point of members) {
-      const home = homes.get(point);
-      if (home) Object.assign(point, home);
-      point.x = Math.max(0, Math.min(bounds.width, point.x));
-      point.y = Math.max(0, Math.min(bounds.height, point.y));
-    }
     members.clear();
-    homes.clear();
-    previous = motionAnchor = null;
-    quietFrames = 0;
-    resting = false;
+    center = null;
+    strength = 0;
   }
-
   return {
     members,
     get center() {
-      return previous;
+      return center;
     },
-    get settled() {
-      return resting;
+    get strength() {
+      return strength;
     },
     reset,
     advance(
@@ -229,130 +121,78 @@ export function createParticleSimulation() {
       cursor: Position | null,
       step = 1,
     ) {
-      bounds.width = width;
-      bounds.height = height;
-      if (!cursor) {
-        reset();
+      if (cursor && step > 0) {
+        const start = center ?? cursor;
+        const dx = cursor.x - start.x;
+        const dy = cursor.y - start.y;
+        const speed = Math.hypot(dx, dy) / step;
+        const target = 1 / (1 + (speed / 1.5) ** 2);
+        // Integrate the field and cursor path together, including low refresh
+        // rates. Moving releases quickly; stillness brings attraction in slowly.
+        let elapsed = 0;
+        while (elapsed < step) {
+          const delta = Math.min(0.5, step - elapsed);
+          elapsed += delta;
+          const response = target < strength ? 45 : 700;
+          strength +=
+            (target - strength) *
+            -Math.expm1((-frameDuration * delta) / response);
+          advanceParticles(
+            points,
+            width,
+            height,
+            {
+              x: start.x + (dx * elapsed) / step,
+              y: start.y + (dy * elapsed) / step,
+            },
+            delta,
+            strength,
+          );
+        }
+      } else if (!cursor) {
+        strength = 0;
         advanceParticles(points, width, height, null, step);
-        return;
       }
-      const dx = previous ? cursor.x - previous.x : 0;
-      const dy = previous ? cursor.y - previous.y : 0;
-      if (Math.hypot(dx, dy) > 160) reset();
-      // Preserve the ambient trajectories while their visible nodes are collected.
-      for (let remaining = step; remaining > 0; remaining -= 1)
-        for (const home of homes.values())
-          advanceParticle(home, width, height, Math.min(1, remaining));
-      const moved =
-        !motionAnchor ||
-        Math.hypot(cursor.x - motionAnchor.x, cursor.y - motionAnchor.y) > 1.5;
-      if (moved) {
-        motionAnchor = { x: cursor.x, y: cursor.y };
-        quietFrames = 0;
-        resting = false;
-      }
-      if (resting) {
-        for (let remaining = step; remaining > 0; remaining -= 1)
-          for (const point of points)
-            if (!members.has(point))
-              advanceParticle(point, width, height, Math.min(1, remaining));
-        return;
-      }
-      for (const point of members) {
-        // The settled rim follows the cursor; incoming particles travel from
-        // their own positions rather than translating with the whole cohort.
-        const radius = Math.hypot(
-          point.x - (previous?.x ?? cursor.x),
-          point.y - (previous?.y ?? cursor.y),
-        );
-        const follow = 1 - rimTransition(radius);
-        point.x += dx * follow;
-        point.y += dy * follow;
-      }
-      previous = { x: cursor.x, y: cursor.y };
-      for (let remaining = step; remaining > 0; remaining -= 1) {
-        const delta = Math.min(1, remaining);
-        if (!moved) quietFrames += delta;
-        const progress = Math.min(1, quietFrames / 480);
-        const settling = progress * progress * (3 - 2 * progress);
-        group.length = 0;
-        for (const point of points) {
-          if (!members.has(point)) {
-            advanceParticle(point, width, height, delta);
-            const distance = Math.hypot(point.x - cursor.x, point.y - cursor.y);
-            if (
-              moved &&
-              members.size < maximumCapturedParticles &&
-              distance < captureRadius
-            ) {
-              members.add(point);
-              homes.set(point, { ...point });
-            } else continue;
-          } else {
-            point.x += point.vx * delta * (1 - settling) * 0.35;
-            point.y += point.vy * delta * (1 - settling) * 0.35;
-          }
-          const x = point.x - cursor.x;
-          const y = point.y - cursor.y;
-          const radius = Math.hypot(x, y);
-          // Match canvas-nest's soft boundary: only pull inward. Nodes already
-          // inside keep their own positions and drift instead of filling slots.
-          const target = Math.min(radius, collectedRadius);
-          // Pull existing nearby nodes in slowly. Never clamp a distant node
-          // onto the rim: its changing position must explain every new edge.
-          const outer = rimTransition(radius);
-          const speed = (0.42 + 0.2 * outer) * delta * gatheringPace;
-          const response = 0.025 * gatheringPace;
-          const change = Math.max(
-            -speed,
-            Math.min(speed, (target - radius) * -Math.expm1(-response * delta)),
-          );
-          const nextRadius = Math.max(0, radius + change);
-          const angle = Math.atan2(y, x);
-          point.x = cursor.x + Math.cos(angle) * nextRadius;
-          point.y = cursor.y + Math.sin(angle) * nextRadius;
-          group.push(point);
-        }
-        spreadRimParticles(
-          group,
-          width,
-          height,
-          cursor,
-          delta,
-          0,
-          0.003,
-          collectedRadius / 100,
-          true,
-        );
-        if (quietFrames >= 1200 && group.length) {
-          resting = group.every(
-            (point) =>
-              Math.hypot(point.x - cursor.x, point.y - cursor.y) <
-              collectedRadius + 0.15,
-          );
-          if (resting) break;
-        }
-      }
+      center = cursor ? { ...cursor } : null;
+      members.clear();
+      if (cursor)
+        for (const point of points)
+          if (
+            Math.hypot(point.x - cursor.x, point.y - cursor.y) < captureRadius
+          )
+            members.add(point);
     },
   };
 }
 
 export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
-  // Reuse paths grouped by visual strength instead of stroking every edge.
   const levels = 32;
-  const captured: boolean[] = [];
-  const nearby: boolean[] = [];
+  const near: boolean[] = [];
+  const neighbours: number[][] = [];
+  const spokes: number[] = [];
+  const spokeVisibility: number[] = [];
+  let edgeVisibility = new Float32Array(0);
   const buckets = Array.from({ length: levels }, (_, index) => {
     const strength = (index + 0.5) / levels;
     return {
       coordinates: [] as number[],
       used: 0,
-      width: strength * 0.85,
+      width: strength * 1.25,
       color: `rgba(0,0,255,${strength + 0.2})`,
     };
   });
-  function line(a: Position, b: Position, distance: number, range: number) {
-    const strength = (range - distance) / range;
+  function squared(a: Position, b: Position) {
+    return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+  }
+  function line(
+    a: Position,
+    b: Position,
+    distance: number,
+    range: number,
+    visibility = 1,
+  ) {
+    const strength = ((range - distance) / range) * visibility;
+    if (strength <= 0.001) return;
     const bucket =
       buckets[Math.min(levels - 1, Math.floor(strength * levels))]!;
     bucket.coordinates[bucket.used++] = a.x;
@@ -365,53 +205,86 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
     width: number,
     height: number,
     cursor: Position | null,
-    interaction?: {
-      members: ReadonlySet<Particle>;
-    },
+    motion: { step?: number; strength?: number } = {},
   ) {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#000';
     ctx.globalAlpha = 1;
+    spokes.length = maximumSpokes;
+    spokes.fill(-1);
+    const blend = -Math.expm1(-(motion.step ?? 1) / 6);
+    if (edgeVisibility.length !== points.length ** 2)
+      edgeVisibility = new Float32Array(points.length ** 2);
     for (const bucket of buckets) bucket.used = 0;
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
-      captured[i] = !!interaction?.members.has(point);
-      nearby[i] =
-        captured[i] &&
-        !!cursor &&
-        (point.x - cursor.x) ** 2 + (point.y - cursor.y) ** 2 <
-          cursorRangeSquared;
+      near[i] = !!cursor && squared(point, cursor) < cursorRangeSquared;
+      const closest = neighbours[i] ?? (neighbours[i] = []);
+      closest.length = 0;
+      if (cursor && near[i]) {
+        // Limit drawn spokes, not physical attraction. Angular coverage avoids
+        // choosing one side simply because those points came first in an array.
+        const angle =
+          Math.atan2(point.y - cursor.y, point.x - cursor.x) + Math.PI;
+        const sector = Math.min(
+          maximumSpokes - 1,
+          Math.floor((angle / (Math.PI * 2)) * maximumSpokes),
+        );
+        const previous = spokes[sector]!;
+        if (
+          previous < 0 ||
+          squared(point, cursor) < squared(points[previous]!, cursor)
+        )
+          spokes[sector] = i;
+      }
     }
     for (let i = 0; i < points.length; i++) {
       const a = points[i]!;
+      const closest = neighbours[i]!;
       ctx.fillRect(a.x - 0.5, a.y - 0.5, 1, 1);
-      if (cursor && (!interaction || nearby[i])) {
-        const dx = a.x - cursor.x;
-        const dy = a.y - cursor.y;
-        const distance = dx * dx + dy * dy;
-        if (distance < cursorRangeSquared)
-          line(a, cursor, distance, cursorRangeSquared);
-      }
-      for (let j = i + 1; j < points.length; j++) {
-        // Incoming nodes keep their background neighbours while travelling.
-        // Once inside the rim, exclude nodes outside the selected cohort.
-        if (
-          interaction &&
-          captured[i] !== captured[j] &&
-          (nearby[i] || nearby[j])
+      for (let j = 0; j < points.length; j++) {
+        if (i === j) continue;
+        const distance = squared(a, points[j]!);
+        const range = particleRangeSquared;
+        if (distance >= range) continue;
+        let rank = 0;
+        while (
+          rank < closest.length &&
+          squared(a, points[closest[rank]!]!) <= distance
         )
-          continue;
-        const b = points[j]!;
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const distance = dx * dx + dy * dy;
-        // Local distance creates triangles naturally, including diagonals and
-        // inner nodes. No perimeter is drawn across a gap before nodes arrive.
-        const range =
-          interaction && nearby[i] && nearby[j]
-            ? collectedLinkRangeSquared
-            : particleRangeSquared;
-        if (distance < range) line(a, b, distance, range);
+          rank++;
+        if (rank < 3) {
+          closest.splice(rank, 0, j);
+          closest.length = Math.min(3, closest.length);
+        }
+      }
+    }
+    for (let i = 0; i < points.length; i++) {
+      const target = cursor && spokes.includes(i) ? (motion.strength ?? 1) : 0;
+      const previous = spokeVisibility[i] ?? 0;
+      const visible = cursor ? previous + (target - previous) * blend : 0;
+      spokeVisibility[i] = visible;
+      if (cursor && near[i])
+        line(
+          points[i]!,
+          cursor,
+          squared(points[i]!, cursor),
+          cursorRangeSquared,
+          visible,
+        );
+      for (let j = i + 1; j < points.length; j++) {
+        const key = i * points.length + j;
+        const selected =
+          neighbours[i]!.includes(j) || neighbours[j]!.includes(i);
+        const old = edgeVisibility[key]!;
+        const visible = old + ((selected ? 1 : 0) - old) * blend;
+        edgeVisibility[key] = visible;
+        // Use one distance rule across the field boundary, so a crossing edge
+        // never changes length/opacity merely because a point becomes 'inside'.
+        const range = particleRangeSquared;
+        const distance = squared(points[i]!, points[j]!);
+        if (distance < range)
+          line(points[i]!, points[j]!, distance, range, visible);
       }
     }
     for (const bucket of buckets) {
@@ -499,7 +372,10 @@ export function startBackground(canvas: HTMLCanvasElement) {
     previous = time;
     cursor = followCursor(cursor, cursorTarget, step);
     simulation.advance(points, width, height, cursor, step);
-    render(points, width, height, simulation.center, simulation);
+    render(points, width, height, simulation.center, {
+      step,
+      strength: simulation.strength,
+    });
     frame = requestAnimationFrame(draw);
   }
   function sync() {
