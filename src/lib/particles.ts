@@ -18,7 +18,8 @@ interface Position {
 const particleRangeSquared = 6000;
 const cursorRangeSquared = 20000;
 const captureRadius = 320;
-const maximumCapturedParticles = 48;
+const maximumCapturedParticles = 24;
+const collectedRadius = 76;
 const gatheringPace = 0.65;
 const frameDuration = 1000 / 60;
 const contentSurfaces =
@@ -132,7 +133,7 @@ function spreadRimParticles(
     const error =
       Math.max(0, ahead - limit) - Math.max(0, behind - limit) + pressure * 0.9;
     if (!error) continue;
-    const inner = Math.min(1, (radius - 85) / 15);
+    const inner = Math.max(0, Math.min(1, (radius - 85) / 15));
     const outer = Math.min(1, (Math.sqrt(cursorRangeSquared) - radius) / 12);
     const weight =
       inner *
@@ -278,7 +279,10 @@ export function createParticleSimulation() {
             ) {
               members.add(point);
               homes.set(point, { ...point });
-              radii.set(point, 100 + Math.sin(members.size * 2.399963) * 2);
+              radii.set(
+                point,
+                collectedRadius + Math.sin(members.size * 2.399963) * 1.5,
+              );
             } else continue;
           } else {
             point.x += point.vx * delta * (1 - settling) * 0.35;
@@ -345,12 +349,15 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
   const levels = 32;
   const captured: boolean[] = [];
   const nearby: boolean[] = [];
+  const rimIndices: number[] = [];
+  const rimRanks: number[] = [];
+  const rimAngles: number[] = [];
   const buckets = Array.from({ length: levels }, (_, index) => {
     const strength = (index + 0.5) / levels;
     return {
       coordinates: [] as number[],
       used: 0,
-      width: strength / 2,
+      width: strength * 0.85,
       color: `rgba(0,0,255,${strength + 0.2})`,
     };
   });
@@ -375,21 +382,7 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = '#000';
     ctx.globalAlpha = 1;
-    // Keep triangles with fewer long cross-links in the collected mesh.
-    const meshRangeSquared = interaction
-      ? 0.55 *
-        Math.max(
-          particleRangeSquared,
-          Math.min(
-            14400,
-            (204 *
-              Math.sin(
-                (3 * Math.PI) / Math.max(12, interaction.members.size),
-              )) **
-              2,
-          ),
-        )
-      : particleRangeSquared;
+    rimIndices.length = 0;
     for (const bucket of buckets) bucket.used = 0;
     for (let i = 0; i < points.length; i++) {
       const point = points[i]!;
@@ -399,7 +392,14 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
         !!cursor &&
         (point.x - cursor.x) ** 2 + (point.y - cursor.y) ** 2 <
           cursorRangeSquared;
+      if (nearby[i] && cursor) {
+        rimAngles[i] = Math.atan2(point.y - cursor.y, point.x - cursor.x);
+        rimIndices.push(i);
+      }
     }
+    rimIndices.sort((a, b) => rimAngles[a]! - rimAngles[b]!);
+    for (let rank = 0; rank < rimIndices.length; rank++)
+      rimRanks[rimIndices[rank]!] = rank;
     for (let i = 0; i < points.length; i++) {
       const a = points[i]!;
       ctx.fillRect(a.x - 0.5, a.y - 0.5, 1, 1);
@@ -423,10 +423,15 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const distance = dx * dx + dy * dy;
-        const range =
-          interaction && nearby[i] && nearby[j]
-            ? meshRangeSquared
-            : particleRangeSquared;
+        let range = particleRangeSquared;
+        if (interaction && nearby[i] && nearby[j]) {
+          // Existing arriving nodes add corners to one closed polygon.
+          // Keep its outline and spokes clear as the vertices approach the rim.
+          const separation = Math.abs(rimRanks[i]! - rimRanks[j]!);
+          if (separation !== 1 && separation !== rimIndices.length - 1)
+            continue;
+          range = 4 * cursorRangeSquared;
+        }
         if (distance < range) line(a, b, distance, range);
       }
     }

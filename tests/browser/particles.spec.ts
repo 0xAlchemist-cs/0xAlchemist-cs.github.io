@@ -111,23 +111,26 @@ test('周围原有粒子逐渐移入并连接，卡片区域立即消散', async
   const initial = await read();
   expect(initial.spokes).toBe(0);
   expect(
-    initial.radii.every(
-      (radius, i) =>
-        radius < before.radii[i]! && radius > before.radii[i]! - 15,
-    ),
+    initial.radii
+      .slice(0, 24)
+      .every(
+        (radius, i) =>
+          radius < before.radii[i]! && radius > before.radii[i]! - 15,
+      ),
   ).toBe(true);
+  expect(initial.radii.slice(24)).toEqual(before.radii.slice(24));
   expect(initial.dots).toBe(120);
   expect(initial.minimumDotOpacity).toBe(1);
   await page.clock.runFor(1400);
   const growing = await read();
   expect(growing.spokes).toBeGreaterThan(initial.spokes);
-  expect(growing.spokes).toBeLessThan(32);
+  expect(growing.spokes).toBeLessThan(24);
   expect(growing.opacity).toBe(1);
   await page.clock.runFor(4000);
   expect((await read()).spokes).toBeGreaterThan(growing.spokes);
   await page.clock.runFor(7400);
-  expect((await read()).spokes).toBe(32);
-  expect(Math.max(...(await read()).radii)).toBeLessThan(103);
+  expect((await read()).spokes).toBe(24);
+  expect(Math.max(...(await read()).radii.slice(0, 24))).toBeLessThan(80);
   await backgroundOnly.evaluate((style) =>
     style.parentNode?.removeChild(style),
   );
@@ -226,7 +229,7 @@ test('鼠标停留后线网停止吸收外部粒子，并稳定半径与位置',
     content: '.site-shell { visibility: hidden !important; }',
   });
   await page.mouse.move(500, 500);
-  await page.clock.runFor(4000);
+  await page.clock.runFor(10000);
   const read = () =>
     page.evaluate(() =>
       (
@@ -239,11 +242,11 @@ test('鼠标停留后线网停止吸收外部粒子，并稳定半径与位置',
   const first = await read();
   await page.clock.runFor(16000);
   const later = await read();
-  expect(first.length).toBe(32);
+  expect(first.length).toBe(24);
   expect(later.length).toBe(first.length);
   expect(
     Math.max(...later.map((p) => Math.hypot(p.x - 500, p.y - 500))),
-  ).toBeLessThan(106);
+  ).toBeLessThan(80);
   expect(
     Math.max(
       ...later.map((p, i) => Math.hypot(p.x - first[i]!.x, p.y - first[i]!.y)),

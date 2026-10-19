@@ -90,10 +90,10 @@ test('移动鼠标时外围粒子从原位置追赶，不随圆心整体平移',
 });
 
 test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新移动可继续收集', () => {
-  const points = Array.from({ length: 48 }, (_, index) => {
-    const angle = (index / 32) * Math.PI * 2;
-    const radius = index < 32 ? 104 : index < 40 ? 240 : 360;
-    const speed = index < 32 ? 0.4 : -0.5;
+  const points = Array.from({ length: 28 }, (_, index) => {
+    const angle = (index / 12) * Math.PI * 2;
+    const radius = index < 12 ? 104 : index < 20 ? 240 : 360;
+    const speed = index < 12 ? 0.4 : -0.5;
     return {
       x: cursor.x + Math.cos(angle) * radius,
       y: cursor.y + Math.sin(angle) * radius,
@@ -107,7 +107,7 @@ test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新�
     simulation.advance(points, 1200, 900, cursor);
     advanceParticle(ambient, 1200, 900);
   }
-  assert.equal(simulation.members.size, 40, '只能吸引已选定的周围粒子');
+  assert.equal(simulation.members.size, 20, '只能吸引已选定的周围粒子');
   const before = [...simulation.members].map((p) => ({ ...p }));
   for (let frame = 0; frame < 1200; frame++) {
     simulation.advance(points, 1200, 900, cursor);
@@ -117,14 +117,14 @@ test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新�
     assert.ok(
       Math.hypot(point.x - before[index]!.x, point.y - before[index]!.y) < 0.1,
     );
-    assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 103);
+    assert.ok(Math.hypot(point.x - cursor.x, point.y - cursor.y) < 80);
   }
-  points[40]!.x = cursor.x + 160;
-  points[40]!.y = cursor.y;
-  points[40]!.vx = points[40]!.vy = 0;
+  points[20]!.x = cursor.x + 160;
+  points[20]!.y = cursor.y;
+  points[20]!.vx = points[20]!.vy = 0;
   simulation.advance(points, 1200, 900, { x: cursor.x + 40, y: cursor.y });
   advanceParticle(ambient, 1200, 900);
-  assert.ok(simulation.members.size > 40, '重新移动后应恢复收集');
+  assert.ok(simulation.members.size > 20, '重新移动后应恢复收集');
   simulation.advance(points, 1200, 900, null);
   advanceParticle(ambient, 1200, 900);
   assert.equal(simulation.members.size, 0);
@@ -133,11 +133,11 @@ test('周围选定粒子汇入后稳定，不无限吸收外部粒子，重新�
 
 test('停留后的重排没有快速扩张阶段，最终整圈密度稳定', () => {
   for (const rate of [30, 60, 144]) {
-    const points = Array.from({ length: 48 }, (_, index) => {
+    const points = Array.from({ length: 24 }, (_, index) => {
       const angle =
-        (index < 32 ? 0 : Math.PI) -
+        (index < 16 ? 0 : Math.PI) -
         0.24 +
-        (index < 32 ? index / 31 : (index - 32) / 15) * 0.48;
+        (index < 16 ? index / 15 : (index - 16) / 7) * 0.48;
       return {
         x: cursor.x + Math.cos(angle) * 104,
         y: cursor.y + Math.sin(angle) * 104,
@@ -246,6 +246,57 @@ test('稳定线网不与外部粒子连接，周围背景仍独立绘制', () =>
       (edge) => edge.from.x === cursor.x + 190 && edge.to.x === cursor.x + 200,
     ),
   );
+});
+
+test('较粗的轮廓只连接相邻顶点，多边形闭合并保留向中心的连线', () => {
+  const vertices = [0, 0.4, 0.9, 1.5, 2.1, 3.2, 4.8, 5.5].map((angle) => ({
+    x: cursor.x + Math.cos(angle) * 76,
+    y: cursor.y + Math.sin(angle) * 76,
+    vx: 0,
+    vy: 0,
+  }));
+  const points = [4, 0, 6, 2, 7, 1, 5, 3].map((index) => vertices[index]!);
+  const edges: {
+    from: { x: number; y: number };
+    to: { x: number; y: number };
+  }[] = [];
+  let start = cursor;
+  let widest = 0;
+  const context = {
+    clearRect: () => {},
+    fillRect: () => {},
+    beginPath: () => {},
+    moveTo: (x: number, y: number) => {
+      start = { x, y };
+    },
+    lineTo: (x: number, y: number) => {
+      edges.push({ from: start, to: { x, y } });
+    },
+    stroke: () => {
+      widest = Math.max(widest, context.lineWidth);
+    },
+  } as unknown as CanvasRenderingContext2D;
+  createParticleRenderer(context)(points, 1200, 900, cursor, {
+    members: new Set(points),
+  });
+  const spokes = edges.filter(
+    (edge) => Math.hypot(edge.to.x - cursor.x, edge.to.y - cursor.y) < 1e-8,
+  );
+  assert.equal(spokes.length, vertices.length);
+  const key = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    [a, b]
+      .map((point) => `${point.x.toFixed(6)},${point.y.toFixed(6)}`)
+      .sort()
+      .join('|');
+  const outline = edges
+    .filter((edge) => !spokes.includes(edge))
+    .map((edge) => key(edge.from, edge.to))
+    .sort();
+  const expected = vertices
+    .map((point, index) => key(point, vertices[(index + 1) % vertices.length]!))
+    .sort();
+  assert.deepEqual(outline, expected, '折边应该围成闭合轮廓，不额外画跨圈弦');
+  assert.ok(widest > 0.5, '轮廓需要比原来的细线更明显');
 });
 
 function largestGap(points: Particle[]) {
