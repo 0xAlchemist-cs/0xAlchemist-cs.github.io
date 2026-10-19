@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 test.beforeEach(async ({ page }) => {
   // Astro's initial content-store write can request a full reload after the
@@ -14,278 +14,180 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('周围原有粒子逐渐移入并连接，卡片区域立即消散', async ({ page }, info) => {
-  test.skip(info.project.name === 'mobile', '桌面鼠标交互');
+type Scene = {
+  x: number;
+  y: number;
+  dots: { x: number; y: number }[];
+  spokes: number;
+  centreDots: number;
+};
+async function referenceScene(page: Page, incoming: boolean) {
   await page.clock.install();
-  await page.addInitScript(() => {
-    const harness = window as unknown as {
-      hoverMesh: {
-        x: number;
-        y: number;
-        spokes: number;
-        opacity: number;
-        dots: number;
-        minimumDotOpacity: number;
-        radii: number[];
-        positions: { x: number; y: number }[];
+  await page.addInitScript(
+    ({ incoming }) => {
+      const harness = window as unknown as { nestScene: Scene };
+      harness.nestScene = {
+        x: 500,
+        y: 500,
+        dots: [],
+        spokes: 0,
+        centreDots: 0,
       };
-    };
-    harness.hoverMesh = {
-      x: 500,
-      y: 500,
-      spokes: 0,
-      opacity: 0,
-      dots: 0,
-      minimumDotOpacity: 1,
-      radii: [],
-      positions: [],
-    };
-    const random = Math.random;
-    let index = 0;
-    Math.random = () => {
-      if (!new Error().stack?.includes('/src/lib/particles.ts'))
-        return random();
-      const particle = Math.floor(index / 4);
-      const component = index++ % 4;
-      const angle = (particle / 32) * Math.PI * 2;
-      const radius = 150 + particle * 1.5;
-      const x = particle < 32 ? 500 + Math.cos(angle) * radius : 1250;
-      const y = particle < 32 ? 500 + Math.sin(angle) * radius : 850;
-      return component === 0 ? x / 1440 : component === 1 ? y / 1000 : 0.5;
-    };
-    const clear = CanvasRenderingContext2D.prototype.clearRect;
-    const line = CanvasRenderingContext2D.prototype.lineTo;
-    const fill = CanvasRenderingContext2D.prototype.fillRect;
-    CanvasRenderingContext2D.prototype.clearRect = function (x, y, w, h) {
-      if (this.canvas.id === 'particle-background') {
-        harness.hoverMesh.spokes = 0;
-        harness.hoverMesh.opacity = 0;
-        harness.hoverMesh.dots = 0;
-        harness.hoverMesh.minimumDotOpacity = 1;
-        harness.hoverMesh.radii.length = 0;
-        harness.hoverMesh.positions.length = 0;
-      }
-      return clear.call(this, x, y, w, h);
-    };
-    CanvasRenderingContext2D.prototype.fillRect = function (x, y, w, h) {
-      if (this.canvas.id === 'particle-background') {
-        harness.hoverMesh.dots++;
-        if (harness.hoverMesh.dots <= 32)
-          harness.hoverMesh.positions.push({ x: x + 0.5, y: y + 0.5 });
-        if (harness.hoverMesh.dots <= 32)
-          harness.hoverMesh.radii.push(
-            Math.hypot(
-              x + 0.5 - harness.hoverMesh.x,
-              y + 0.5 - harness.hoverMesh.y,
-            ),
-          );
-        harness.hoverMesh.minimumDotOpacity = Math.min(
-          harness.hoverMesh.minimumDotOpacity,
-          this.globalAlpha,
-        );
-      }
-      return fill.call(this, x, y, w, h);
-    };
-    CanvasRenderingContext2D.prototype.lineTo = function (x, y) {
-      if (
-        this.canvas.id === 'particle-background' &&
-        Math.hypot(x - harness.hoverMesh.x, y - harness.hoverMesh.y) < 0.001
-      ) {
-        harness.hoverMesh.spokes++;
-        harness.hoverMesh.opacity = Math.max(
-          harness.hoverMesh.opacity,
-          this.globalAlpha,
-        );
-      }
-      return line.call(this, x, y);
-    };
-  });
+      const random = Math.random;
+      let index = 0;
+      Math.random = () => {
+        if (!new Error().stack?.includes('/src/lib/particles.ts'))
+          return random();
+        const particle = Math.floor(index / 4);
+        const component = index++ % 4;
+        const angle = (particle / 12) * Math.PI * 2;
+        const radius = incoming ? 160 + particle * 4 : 110;
+        const x =
+          particle < 12
+            ? 500 + Math.cos(angle) * radius
+            : 1000 + (particle % 9) * 45;
+        const y =
+          particle < 12
+            ? 500 + Math.sin(angle) * radius
+            : 100 + Math.floor((particle - 12) / 9) * 80;
+        if (component === 0) return x / 1440;
+        if (component === 1) return y / 1000;
+        const velocity =
+          particle >= 12
+            ? 0
+            : incoming
+              ? (component === 2 ? Math.cos(angle) : Math.sin(angle)) * -0.3
+              : component === 2
+                ? Math.cos(angle) * 0.4 - Math.sin(angle) * 0.2
+                : Math.sin(angle) * 0.4 + Math.cos(angle) * 0.2;
+        return (velocity + 1) / 2;
+      };
+      const clear = CanvasRenderingContext2D.prototype.clearRect;
+      const fill = CanvasRenderingContext2D.prototype.fillRect;
+      const line = CanvasRenderingContext2D.prototype.lineTo;
+      CanvasRenderingContext2D.prototype.clearRect = function (x, y, w, h) {
+        if (this.canvas.id === 'particle-background') {
+          harness.nestScene.dots.length = 0;
+          harness.nestScene.spokes = harness.nestScene.centreDots = 0;
+        }
+        return clear.call(this, x, y, w, h);
+      };
+      CanvasRenderingContext2D.prototype.fillRect = function (x, y, w, h) {
+        if (this.canvas.id === 'particle-background') {
+          const scene = harness.nestScene;
+          scene.dots.push({ x: x + 0.5, y: y + 0.5 });
+          if (Math.hypot(x + 0.5 - scene.x, y + 0.5 - scene.y) < 0.001)
+            scene.centreDots++;
+        }
+        return fill.call(this, x, y, w, h);
+      };
+      CanvasRenderingContext2D.prototype.lineTo = function (x, y) {
+        if (
+          this.canvas.id === 'particle-background' &&
+          Math.hypot(x - harness.nestScene.x, y - harness.nestScene.y) < 0.001
+        )
+          harness.nestScene.spokes++;
+        return line.call(this, x, y);
+      };
+    },
+    { incoming },
+  );
   await page.goto('http://127.0.0.1:4321/');
   await expect(page.locator('#particle-background')).toHaveAttribute(
     'data-state',
     'running',
   );
-  const read = () =>
-    page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            hoverMesh: {
-              spokes: number;
-              opacity: number;
-              dots: number;
-              minimumDotOpacity: number;
-              radii: number[];
-              positions: { x: number; y: number }[];
-            };
-          }
-        ).hoverMesh,
-    );
-  const backgroundOnly = await page.addStyleTag({
-    content: '.site-shell { visibility: hidden !important; }',
-  });
-  await page.clock.runFor(32);
-  const before = await read();
-  await page.mouse.move(500, 500);
-  await page.clock.runFor(200);
-  const initial = await read();
-  expect(initial.spokes).toBe(0);
-  expect(
-    initial.radii
-      .slice(0, 32)
-      .every(
-        (radius, i) =>
-          radius < before.radii[i]! && radius > before.radii[i]! - 15,
-      ),
-  ).toBe(true);
-  expect(initial.dots).toBe(120);
-  expect(initial.minimumDotOpacity).toBe(1);
-  await page.clock.runFor(1400);
-  const growing = await read();
-  expect(growing.spokes).toBeGreaterThan(initial.spokes);
-  expect(growing.spokes).toBeLessThan(18);
-  expect(growing.opacity).toBe(1);
-  await page.clock.runFor(4000);
-  expect((await read()).spokes).toBeGreaterThan(growing.spokes);
-  await page.clock.runFor(7400);
-  expect((await read()).spokes).toBe(18);
-  expect(Math.max(...(await read()).radii.slice(0, 32))).toBeLessThan(85);
-  const collected = await read();
-  await backgroundOnly.evaluate((style) =>
-    style.parentNode?.removeChild(style),
-  );
-  const card = await page.locator('.article-card').first().boundingBox();
-  const target = { x: card!.x + 2, y: card!.y + card!.height / 2 };
-  await page.evaluate(
-    ({ x, y }) =>
-      Object.assign((window as unknown as { hoverMesh: object }).hoverMesh, {
-        x,
-        y,
-      }),
-    target,
-  );
-  await page.mouse.move(target.x, target.y);
-  await page.clock.runFor(32);
-  expect((await read()).spokes).toBe(0);
-  expect(
-    Math.max(
-      ...(await read()).positions.map((point, index) =>
-        Math.hypot(
-          point.x - collected.positions[index]!.x,
-          point.y - collected.positions[index]!.y,
-        ),
-      ),
-    ),
-  ).toBeLessThan(0.01);
-  await page.clock.runFor(1000);
-  expect((await read()).spokes).toBe(0);
-  await page.evaluate(() =>
-    Object.assign((window as unknown as { hoverMesh: object }).hoverMesh, {
-      x: 500,
-      y: 500,
-    }),
-  );
-  await page.addStyleTag({
-    content: '.site-shell { visibility: hidden !important; }',
-  });
-  await page.mouse.move(500, 500);
-  await page.clock.runFor(200);
-  expect((await read()).spokes).toBeLessThanOrEqual(18);
-  expect((await read()).dots).toBe(120);
-});
-
-test('停留时新粒子持续接入，移动后旧圈从当前位置松开', async ({
-  page,
-}, info) => {
-  test.skip(info.project.name === 'mobile', '桌面鼠标停留和移动场景');
-  test.setTimeout(60000);
-  await page.clock.install();
-  await page.addInitScript(() => {
-    const harness = window as unknown as {
-      motionDots: { x: number; y: number }[];
-    };
-    harness.motionDots = [];
-    const random = Math.random;
-    let index = 0;
-    Math.random = () => {
-      if (!new Error().stack?.includes('/src/lib/particles.ts'))
-        return random();
-      const point = Math.floor(index / 4);
-      const component = index++ % 4;
-      const angle = (point / (point < 32 ? 32 : 88)) * Math.PI * 2;
-      const radius = point < 32 ? 104 : 240 + (point - 32) * 1.5;
-      const radial = point < 32 ? 0.4 : -0.85;
-      const tangent = point < 32 ? 0.12 : 0;
-      if (component === 0) return (500 + Math.cos(angle) * radius) / 1440;
-      if (component === 1) return (500 + Math.sin(angle) * radius) / 1000;
-      const velocity =
-        component === 2
-          ? Math.cos(angle) * radial - Math.sin(angle) * tangent
-          : Math.sin(angle) * radial + Math.cos(angle) * tangent;
-      return (velocity + 1) / 2;
-    };
-    const clear = CanvasRenderingContext2D.prototype.clearRect;
-    const fill = CanvasRenderingContext2D.prototype.fillRect;
-    CanvasRenderingContext2D.prototype.clearRect = function (x, y, w, h) {
-      if (this.canvas.id === 'particle-background')
-        harness.motionDots.length = 0;
-      return clear.call(this, x, y, w, h);
-    };
-    CanvasRenderingContext2D.prototype.fillRect = function (x, y, w, h) {
-      if (this.canvas.id === 'particle-background')
-        harness.motionDots.push({ x: x + 0.5, y: y + 0.5 });
-      return fill.call(this, x, y, w, h);
-    };
-  });
-  await page.goto('http://127.0.0.1:4321/');
-  await expect(page.locator('#particle-background')).toHaveAttribute(
-    'data-state',
-    'running',
-  );
-  await page.addStyleTag({
+  const style = await page.addStyleTag({
     content: '.site-shell { visibility:hidden!important }',
   });
   const read = () =>
-    page.evaluate(
-      () =>
-        (window as unknown as { motionDots: { x: number; y: number }[] })
-          .motionDots,
+    page.evaluate(() => (window as unknown as { nestScene: Scene }).nestScene);
+  const move = async (x: number, y: number) => {
+    await page.evaluate(
+      ({ x, y }) =>
+        Object.assign((window as unknown as { nestScene: Scene }).nestScene, {
+          x,
+          y,
+        }),
+      { x, y },
     );
-  const radius = (p: { x: number; y: number }) =>
-    Math.hypot(p.x - 500, p.y - 500);
-  await page.mouse.move(500, 500);
-  await page.clock.runFor(6000);
-  const early = await read();
-  await page.clock.runFor(19000);
+    await page.mouse.move(x, y);
+  };
+  return { read, move, style };
+}
+
+test('原版99个真实粒子，鼠标不增中心点，漂入范围才自然连线', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name === 'mobile', '桌面原站鼠标效果');
+  const { read, move, style } = await referenceScene(page, true);
+  await move(800, 100);
+  await page.clock.runFor(200);
+  expect((await read()).dots).toHaveLength(99);
+  expect((await read()).spokes).toBe(0);
+  expect((await read()).centreDots).toBe(0);
+  await move(500, 500);
+  await page.clock.runFor(200);
+  expect((await read()).spokes).toBe(0);
+  await page.clock.runFor(1400);
+  const growing = await read();
+  expect(growing.spokes).toBeGreaterThan(0);
+  expect(growing.spokes).toBeLessThan(12);
+  await page.clock.runFor(4000);
   const collected = await read();
-  expect(collected).toHaveLength(120);
-  expect(radius(collected[70]!)).toBeLessThan(90);
-  expect(radius(early[70]!) - radius(collected[70]!)).toBeGreaterThan(10);
-  await page.clock.runFor(5000);
-  const drifting = await read();
+  expect(collected.spokes).toBe(12);
+  expect(collected.dots).toHaveLength(99);
+  expect(collected.centreDots).toBe(0);
+  await style.evaluate((element) => element.parentNode?.removeChild(element));
+  const card = await page.locator('.article-card').first().boundingBox();
+  await move(card!.x + 2, card!.y + card!.height / 2);
+  await page.clock.runFor(32);
+  const released = await read();
+  expect(released.spokes).toBe(0);
+  expect(released.dots).toHaveLength(99);
   expect(
-    Math.hypot(
-      drifting[0]!.x - collected[0]!.x,
-      drifting[0]!.y - collected[0]!.y,
+    Math.max(
+      ...released.dots
+        .slice(0, 12)
+        .map((point, i) =>
+          Math.hypot(
+            point.x - collected.dots[i]!.x,
+            point.y - collected.dots[i]!.y,
+          ),
+        ),
     ),
-  ).toBeGreaterThan(1);
-  await page.mouse.move(850, 500);
+  ).toBeLessThan(6);
+});
+
+test('原版鼠标移开后旧圈自然散开，不刚性拖动或恢复隐藏轨迹', async ({
+  page,
+}, info) => {
+  test.skip(info.project.name === 'mobile', '桌面原站鼠标效果');
+  const { read, move } = await referenceScene(page, false);
+  await move(500, 500);
+  await page.clock.runFor(2000);
+  const collected = await read();
+  expect(collected.spokes).toBe(12);
+  expect(collected.centreDots).toBe(0);
+  await move(850, 500);
   await page.clock.runFor(200);
   const released = await read();
+  expect(released.spokes).toBe(0);
   expect(
     Math.hypot(
-      released[0]!.x - drifting[0]!.x,
-      released[0]!.y - drifting[0]!.y,
+      released.dots[0]!.x - collected.dots[0]!.x,
+      released.dots[0]!.y - collected.dots[0]!.y,
     ),
   ).toBeLessThan(15);
   await page.clock.runFor(2000);
   const dispersed = await read();
   expect(
     Math.hypot(
-      dispersed[0]!.x - released[0]!.x,
-      dispersed[0]!.y - released[0]!.y,
+      dispersed.dots[0]!.x - released.dots[0]!.x,
+      dispersed.dots[0]!.y - released.dots[0]!.y,
     ),
   ).toBeGreaterThan(30);
+  expect(dispersed.dots).toHaveLength(99);
 });
 
 test('窗口由半屏扩到全屏后，左右两侧都有背景粒子', async ({ page }, info) => {
@@ -479,7 +381,9 @@ test('视口尺寸变化时保留已有粒子，不整批重新随机生成', as
   ).toBe(before);
 });
 
-test('鼠标事件之间仍逐帧平滑跟随', async ({ page }, info) => {
+test('鼠标位置直接使用原站输入，不额外插值或拖动粒子', async ({
+  page,
+}, info) => {
   test.skip(info.project.name === 'mobile', '触屏不启用鼠标吸引');
   await page.addInitScript(() => {
     let next = 1;
@@ -559,11 +463,7 @@ test('鼠标事件之间仍逐帧平滑跟随', async ({ page }, info) => {
       ).tickCursor(time),
     ),
   );
-  expect(samples[0]).toBeGreaterThan(110);
-  expect(samples[0]).toBeLessThan(140);
-  for (let i = 1; i < samples.length; i++)
-    expect(samples[i]!).toBeGreaterThan(samples[i - 1]!);
-  expect(140 - samples[3]!).toBeLessThan(8);
+  expect(samples).toEqual([140, 140, 140, 140]);
 });
 
 test('背景初始化不会同步触发视口布局', async ({ page }) => {
