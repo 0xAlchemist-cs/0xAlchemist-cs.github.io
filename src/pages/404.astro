@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { absolute } from '../config/site';
+---
+
+<BaseLayout
+  title="页面未找到"
+  description="这个地址没有对应的页面，可以返回文章列表继续阅读。"
+  canonical={absolute('/404.html')}
+  noindex
+>
+  <section class="hero">
+    <div class="eyebrow">404 · A SMALL DETOUR</div>
+    <h1>这条线，暂时没有连上。</h1>
+    <p>
+      页面可能已经移动，也可能只是输错了地址。
+      <br />
+      不妨回到文章里，找另一条思路。
+    </p>
+    <div class="hero-bottom">
+      <a class="inline-link" href="/">
+        返回首页 →
+      </a>
+      <a class="inline-link" href="/blog/">
+        浏览文章 →
+      </a>
+    </div>
+  </section>
+</BaseLayout>

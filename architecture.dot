@@ -1,0 +1,77 @@
+digraph Architecture {
+  graph [
+    rankdir=LR,
+    compound=true,
+    splines=polyline,
+    nodesep=0.40,
+    ranksep=0.96,
+    pad=0.42,
+    bgcolor="#F8FAFD",
+    fontname="Noto Sans CJK SC",
+    label="GitHub Pages 免费技术博客  |  产品完整架构图\nAstro · TypeScript · GitHub 深度关联 · SEO / GEO · 零付费依赖",
+    labelloc=t,
+    fontsize=24,
+    fontcolor="#142D4E",
+    labeljust=l
+  ];
+  node [shape=box, style="rounded,filled", fontname="Noto Sans CJK SC", fontsize=12, color="#C8D7E8", fillcolor="white", fontcolor="#1B3352", penwidth=1.2, margin="0.20,0.14"];
+  edge [color="#7093B9", arrowsize=.70, penwidth=1.45, fontname="Noto Sans CJK SC", fontsize=10, fontcolor="#3C5B7B"];
+
+  subgraph cluster_author {
+    label="01  内容与作者";
+    fontname="Noto Sans CJK SC"; fontsize=16; fontcolor="#16477A";
+    color="#D2E3F4"; fillcolor="#EFF6FD"; style="rounded,filled"; penwidth=1.5;
+    author [label="本地作者 / Codex\nVS Code · Git · PR", fillcolor="#DDEDFB", color="#A6C9EC"];
+    posts [label="Markdown / MDX\n文章 · 标签 · 草稿 · 引用"];
+    selection [label="精选公开项目配置\n项目↔文章映射"];
+  }
+  subgraph cluster_github {
+    label="02  GitHub 协作与数据";
+    fontname="Noto Sans CJK SC"; fontsize=16; fontcolor="#16477A";
+    color="#D3E3F4"; fillcolor="#F1F6FD"; style="rounded,filled"; penwidth=1.5;
+    repo [label="GitHub Public Repository\n<username>.github.io", fillcolor="#DDEDFB", color="#9FBEDE"];
+    checks [label="PR 质量检查\n类型 · 内容 · 链接 · SEO", fillcolor="#F2F7FE"];
+    sync [label="公开 GitHub API 同步\n低频构建缓存 · 故障回退"];
+  }
+  subgraph cluster_build {
+    label="03  静态生成与自动部署";
+    fontname="Noto Sans CJK SC"; fontsize=16; fontcolor="#196C60";
+    color="#C7E7DE"; fillcolor="#EEFAF6"; style="rounded,filled"; penwidth=1.5;
+    audit [label="确定性 SEO 审计\n无 Key 可运行", fillcolor="#E0F5EC", color="#B9DFCF"];
+    ai [label="可选 AI 文章建议\n显式配置 Key · 人工审核", color="#A6C5B8", style="rounded,filled,dashed", fillcolor="#FAFDFC"];
+    build [label="Astro 静态构建\nTypeScript · Content Collections", fillcolor="#D0F1E5", color="#95CBB8", penwidth=1.8];
+    output [label="静态产物 dist/\nHTML · JSON-LD · RSS\nSitemap · robots · 搜索索引", fillcolor="#E1F6EF", color="#AFDAC9"];
+  }
+  subgraph cluster_delivery {
+    label="04  访问、搜索与反馈";
+    fontname="Noto Sans CJK SC"; fontsize=16; fontcolor="#734B9B";
+    color="#E5D6F4"; fillcolor="#F9F3FE"; style="rounded,filled"; penwidth=1.5;
+    pages [label="GitHub Pages\nHTTPS://<username>.github.io", fillcolor="#EEE2FC", color="#D3B8EF", penwidth=1.8];
+    readers [label="访客浏览器\n文章 · 项目 · 静态搜索"];
+    crawlers [label="Google / Bing / AI 搜索爬虫\n按公开网页与抓取规则访问"];
+    console [label="可选搜索效果监测\nSearch Console / Bing 工具"];
+  }
+
+  author -> posts [label="撰写"];
+  author -> selection [label="选择项目"];
+  posts -> repo [label="提交 / PR"];
+  selection -> repo [label="版本化配置"];
+  repo -> checks [label="触发 CI"];
+  checks -> audit [label="通过后"];
+  repo -> sync [label="同步公开 Repo"];
+  sync -> build [label="静态缓存"];
+  audit -> build [label="合格内容"];
+  repo -> build [label="main / Actions", constraint=false];
+  ai -> audit [style=dashed, label="建议，不阻断"];
+  build -> output [label="预渲染"];
+  output -> pages [label="Actions 部署"];
+  pages -> readers [label="免费公开访问"];
+  pages -> crawlers [label="可被发现"];
+  crawlers -> console [label="数据 / 验证", style=dashed];
+  console -> author [label="反馈优化", constraint=false, style=dashed, color="#AD91C7"];
+
+  note [shape=note, fillcolor="#FFF7E8", color="#EACCA0", fontsize=10,
+        label="约束：不购买域名 / VPS / SaaS；没有 API Key 也可发布。\n密钥只留在 Actions Secrets，绝不进入静态 HTML 或前端。\nSitemap 与 SEO 只能帮助发现，无法保证搜索收录或 AI 引用。"];
+  {rank=sink; note}
+  pages -> note [style=invis];
+}

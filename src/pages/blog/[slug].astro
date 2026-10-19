@@ -1,0 +1,221 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Breadcrumb from '../../components/Breadcrumb.astro';
+import ArticleCard from '../../components/ArticleCard.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import {
+  posts,
+  projects,
+  linkedProjects,
+  dateLabel,
+  readingMinutes,
+  type Post,
+} from '../../lib/content';
+import { topicSlug } from '../../lib/schemas';
+import { articleSchema, breadcrumbs } from '../../lib/seo';
+export async function getStaticPaths() {
+  return (await posts()).map((post) => ({
+    params: { slug: post.data.slug },
+    props: { post },
+  }));
+}
+interface Props {
+  post: Post;
+}
+const { post } = Astro.props;
+const { Content, headings } = await render(post);
+const all = await posts();
+const index = all.findIndex((entry) => entry.id === post.id);
+const newer = all[index - 1];
+const older = all[index + 1];
+const related = all
+  .filter(
+    (entry) =>
+      entry.id !== post.id &&
+      (entry.data.category === post.data.category ||
+        entry.data.tags.some((tag) => post.data.tags.includes(tag))),
+  )
+  .slice(0, 3);
+const repos = linkedProjects(post, await projects());
+const otherRepos = post.data.relatedRepos.filter(
+  (name) =>
+    !repos.some(
+      (project) =>
+        project.data.repoFullName?.toLowerCase() === name.toLowerCase(),
+    ),
+);
+const toc = headings.filter(
+  (heading) => heading.depth === 2 || heading.depth === 3,
+);
+---
+
+<BaseLayout
+  title={post.data.title}
+  description={post.data.description}
+  canonical={post.data.canonical}
+  schemas={[
+    articleSchema(post.data),
+    breadcrumbs([
+      { name: '文章', path: '/blog/' },
+      { name: post.data.title, path: `/blog/${post.data.slug}/` },
+    ]),
+  ]}
+  wide
+>
+  <Breadcrumb
+    items={[{ label: '文章', href: '/blog/' }, { label: post.data.title }]}
+  />
+  <div class="article-layout">
+    <article class="article-paper" data-pagefind-body>
+      {(post.data.example || post.data.draft) && (
+        <div class="notice" data-pagefind-ignore>
+          {post.data.example
+            ? '这是一篇布局与功能示例，不代表作者真实经历。正式构建会排除本篇。'
+            : '草稿预览：本篇不会进入正式构建。'}
+        </div>
+      )}
+      <header class="article-heading">
+        <div class="article-meta">
+          <time datetime={post.data.publishedAt.toISOString()}>
+            {dateLabel(post.data.publishedAt)}
+          </time>
+          <span>·</span>
+          <a href={`/categories/${topicSlug(post.data.category)}/`}>
+            {post.data.category}
+          </a>
+          <span>·</span>
+          <span>{readingMinutes(post.body)} 分钟阅读</span>
+          {post.data.updatedAt && (
+            <Fragment>
+              <span>·</span>
+              <span>更新于 {dateLabel(post.data.updatedAt)}</span>
+            </Fragment>
+          )}
+        </div>
+        <h1 data-pagefind-meta="title">{post.data.title}</h1>
+        <p class="article-lead" data-pagefind-meta="description">
+          {post.data.description}
+        </p>
+        <div class="tag-list">
+          {post.data.tags.map((tag) => (
+            <a class="text-tag" href={`/tags/${topicSlug(tag)}/`}>
+              # {tag}
+            </a>
+          ))}
+        </div>
+      </header>
+      {post.data.cover && (
+        <img
+          src={post.data.cover}
+          alt={post.data.coverAlt}
+          width="1200"
+          height="630"
+        />
+      )}
+      <div class="prose">
+        <Content />
+      </div>
+      {post.data.references.length > 0 && (
+        <section class="article-references">
+          <h2>参考资料</h2>
+          <ul>
+            {post.data.references.map((reference) => (
+              <li>
+                <a href={reference.url}>{reference.title} ↗</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      <div data-pagefind-ignore>
+        {otherRepos.length > 0 && (
+          <section class="article-references">
+            <h2>相关公开仓库</h2>
+            <ul>
+              {otherRepos.map((name) => (
+                <li>
+                  <a href={`https://github.com/${name}`}>{name} ↗</a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {repos.length > 0 && (
+          <section class="related-section">
+            <h2>文章里的项目</h2>
+            {repos.map((project) => (
+              <ProjectCard project={project} />
+            ))}
+          </section>
+        )}
+        {(older || newer) && (
+          <nav class="post-navigation" aria-label="相邻文章">
+            {older ? (
+              <a href={`/blog/${older.data.slug}/`}>
+                <span>← 更早的一篇</span>
+                {older.data.title}
+              </a>
+            ) : (
+              <span />
+            )}
+            {newer && (
+              <a href={`/blog/${newer.data.slug}/`}>
+                <span>更新的一篇 →</span>
+                {newer.data.title}
+              </a>
+            )}
+          </nav>
+        )}
+        {related.length > 0 && (
+          <section class="related-section">
+            <h2>或许也想读</h2>
+            {related.map((entry) => (
+              <ArticleCard post={entry} />
+            ))}
+          </section>
+        )}
+      </div>
+    </article>
+    {toc.length > 0 && (
+      <aside class="toc" aria-label="文章目录">
+        <details id="article-toc" open>
+          <summary>本篇目录</summary>
+          <ol>
+            {toc.map((heading) => (
+              <li class={`depth-${heading.depth}`}>
+                <a href={`#${heading.slug}`}>{heading.text}</a>
+              </li>
+            ))}
+          </ol>
+        </details>
+      </aside>
+    )}
+  </div>
+</BaseLayout>
+<script>
+  const toc = document.querySelector<HTMLDetailsElement>('#article-toc');
+  if (toc && matchMedia('(max-width: 800px)').matches) toc.open = false;
+  document.querySelectorAll<HTMLPreElement>('.prose pre').forEach((pre) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'copy-code';
+    button.textContent = '复制代码';
+    button.setAttribute('aria-label', '复制这段代码');
+    button.setAttribute('aria-live', 'polite');
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(
+          pre.querySelector('code')?.textContent ?? '',
+        );
+        button.textContent = '已复制';
+      } catch {
+        button.textContent = '请手动选择复制';
+      }
+      setTimeout(() => {
+        button.textContent = '复制代码';
+      }, 2000);
+    });
+    pre.before(button);
+  });
+</script>

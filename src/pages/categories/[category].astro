@@ -1,0 +1,17 @@
+---
+import { posts, topicGroups, type Post } from '../../lib/content';
+import TopicListing from '../../components/TopicListing.astro';
+export async function getStaticPaths() {
+  return topicGroups(await posts(), 'category').map((group) => ({
+    params: { category: decodeURIComponent(group.slug) },
+    props: group,
+  }));
+}
+interface Props {
+  name: string;
+  slug: string;
+  items: Post[];
+}
+---
+
+<TopicListing {...Astro.props} type="category" />

@@ -1,0 +1,62 @@
+---
+import { site, absolute } from '../config/site';
+interface Props {
+  title?: string;
+  description?: string;
+  canonical?: string;
+  noindex?: boolean;
+  schemas?: Record<string, unknown>[];
+}
+const {
+  title,
+  description = site.description,
+  canonical = absolute(Astro.url.pathname),
+  noindex = false,
+  schemas = [],
+} = Astro.props;
+const fullTitle = title ? `${title} · ${site.title}` : site.title;
+const json = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
+---
+
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<meta name="author" content={site.author} />
+<meta name="theme-color" content="#f7f8fc" />
+<link rel="canonical" href={canonical} />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link
+  rel="alternate"
+  type="application/rss+xml"
+  title={site.title}
+  href={absolute('/rss.xml')}
+/>
+{(noindex || import.meta.env.DEV) && (
+  <meta name="robots" content="noindex, follow" />
+)}
+<meta
+  property="og:type"
+  content={
+    schemas.some((s) => s['@type'] === 'BlogPosting') ? 'article' : 'website'
+  }
+/>
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:url" content={canonical} />
+<meta property="og:site_name" content={site.title} />
+<meta property="og:locale" content="zh_CN" />
+<meta property="og:image" content={absolute('/images/default-og.png')} />
+<meta property="og:image:alt" content="0xAlchemist 的博客，技术与随笔" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={absolute('/images/default-og.png')} />
+{schemas.map((schema) => (
+  <script
+    type="application/ld+json"
+    set:html={json({ '@context': 'https://schema.org', ...schema })}
+  />
+))}

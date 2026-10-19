@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { site } from '../config/site';
+import { breadcrumbs } from '../lib/seo';
+---
+
+<BaseLayout
+  title="关于这里"
+  description="关于 0xAlchemist 的博客：技术实践、知识沉淀与生活随笔的个人空间。"
+  schemas={[breadcrumbs([{ name: '关于', path: '/about/' }])]}
+>
+  <header class="page-heading">
+    <div class="eyebrow">A NOTE FROM THE AUTHOR</div>
+    <h1>你好，我是 0xAlchemist。</h1>
+    <p>很高兴，在这里遇见你。</p>
+  </header>
+  <article id="author" class="paper prose listing">
+    <h2>为什么写在这里</h2>
+    <p>
+      给做过的尝试留下一份记录，给暂时没想明白的问题留一个位置。这是一个以技术为主、也容纳生活与思考的个人博客。
+    </p>
+    <p>
+      内容可以五花八门：一次实践、一个工具、一段代码，或某天突然冒出的想法。希望记录本身，能够成为继续探索的起点。
+    </p>
+    <h2>找到我</h2>
+    <p>
+      我的 GitHub 账号是 <a href={site.github}>0xAlchemist-cs ↗</a>
+      。博客中的项目会在确认公开展示后逐一整理。
+    </p>
+    <h2>关于本站</h2>
+    <p>
+      文章以 Markdown 维护，网站由 Astro 静态生成。你可以通过{' '}
+      <a href="/rss.xml">RSS</a> 订阅更新，也可以在 <a href="/archive/">归档</a>{' '}
+      中按时间浏览。
+    </p>
+  </article>
+</BaseLayout>

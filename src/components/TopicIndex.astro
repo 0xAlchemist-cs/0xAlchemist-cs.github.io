@@ -1,0 +1,56 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EmptyState from './EmptyState.astro';
+import { posts, topicGroups } from '../lib/content';
+import { breadcrumbs } from '../lib/seo';
+interface Props {
+  type: 'tags' | 'category';
+}
+const { type } = Astro.props;
+const category = type === 'category';
+const label = category ? '主题分类' : '标签索引';
+const root = category ? '/categories/' : '/tags/';
+const groups = topicGroups(await posts(), type);
+---
+
+<BaseLayout
+  title={label}
+  description={
+    category
+      ? '沿着不同主题，发现博客中的技术实践与生活记录。'
+      : '通过标签查找相关技术文章与随笔。'
+  }
+  schemas={[breadcrumbs([{ name: label, path: root }])]}
+>
+  <header class="page-heading">
+    <div class="eyebrow">
+      {category ? 'FOLLOW YOUR CURIOSITY' : 'SMALL CONNECTIONS'}
+    </div>
+    <h1>{category ? '从一个主题开始。' : '在想法之间，找到关联。'}</h1>
+    <p>
+      {category
+        ? '不限定领域，只留下值得记录的事情。'
+        : '每个标签，都是通往另一篇文章的线索。'}
+    </p>
+    <nav class="page-tools" aria-label="主题浏览方式">
+      <a href={category ? '/tags/' : '/categories/'}>
+        {category ? '查看所有标签' : '查看主题分类'} →
+      </a>
+    </nav>
+  </header>
+  {groups.length ? (
+    <div class="topic-grid">
+      {groups.map((group) => (
+        <a class="topic-card" href={`${root}${group.slug}/`}>
+          {category ? group.name : `# ${group.name}`}
+          <span>{group.items.length} 篇 ↗</span>
+        </a>
+      ))}
+    </div>
+  ) : (
+    <EmptyState
+      title="主题尚未展开"
+      description="发布文章后，分类和标签会自动出现在这里。"
+    />
+  )}
+</BaseLayout>

@@ -1,0 +1,19 @@
+flowchart TD
+  A["确认 GitHub 用户名<br/>公开仓库 username.github.io"] --> B["Astro + TypeScript 初始化"]
+  B --> C["页面与内容模型<br/>文章 · 标签 · Projects · About"]
+  C --> D["SEO/GEO 基础<br/>元数据 · JSON-LD · Sitemap · RSS"]
+  D --> E["GitHub 公开项目联动<br/>精选配置 · 静态缓存 · 错误回退"]
+  E --> F["开发 PR<br/>TypeScript · SEO 检查 · 链接 · Build"]
+  F --> G{"CI 检查通过？"}
+  G -->|否| H["修复错误并重新运行"]
+  H --> F
+  G -->|是| I["人工审查 + 合并 main"]
+  I --> J["GitHub Actions 自动部署"]
+  J --> K{"GitHub Pages 线上验收通过？"}
+  K -->|否| L["分析 Actions 与路径配置"]
+  L --> F
+  K -->|是| M["上线：https://username.github.io"]
+  M --> N["撰写新文章 / 更新项目关联"]
+  N --> F
+  M --> O["可选 Search Console / Bing 检查"]
+  O -.根据真实数据优化.-> N
