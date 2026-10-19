@@ -1,5 +1,6 @@
 import { createCanvasNestFrame, type Particle } from '../vendor/canvas-nest';
 
+const animationSpeed = 0.7;
 const contentSurfaces =
   '.article-card, .project-card, .hero, .side-panel, .article-paper, .paper, .toc, .empty-state, .topic-card, .archive-row, .search-container, img, video, a, button, input, textarea, select, [data-background-static]';
 
@@ -62,7 +63,7 @@ export function startBackground(canvas: HTMLCanvasElement) {
   }
   function draw() {
     if (!initialized || document.hidden || reduced.matches || disabled) return;
-    paint(points, width, height, cursor);
+    paint(points, width, height, cursor, true, animationSpeed);
     frame = requestAnimationFrame(draw);
   }
   function sync() {

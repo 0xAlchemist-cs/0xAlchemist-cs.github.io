@@ -214,3 +214,23 @@ test('移入内容时在当前位置去掉光标连线并重画，不推进或�
     '释放只保留已有粒子之间的近邻边',
   );
 });
+
+test('七成速度同时放慢漂移和吸附，保留原站距离与绘制规则', () => {
+  const capture = recorder();
+  const paint = createCanvasNestFrame(capture.context);
+  const slow = [{ x: 200, y: 200, vx: 0.5, vy: -0.25 }];
+  for (let frame = 0; frame < 60; frame++)
+    paint(slow, 1000, 800, null, true, 0.7);
+  assert.ok(Math.abs(slow[0]!.x - 221) < 1e-10);
+  assert.ok(Math.abs(slow[0]!.y - 189.5) < 1e-10);
+
+  const normalRim = [{ x: 620, y: 450, vx: 0, vy: 0 }];
+  const slowRim = structuredClone(normalRim);
+  paint(normalRim, 1000, 800, { x: 500, y: 450 });
+  paint(slowRim, 1000, 800, { x: 500, y: 450 }, true, 0.7);
+  assert.ok(slowRim[0]!.x > normalRim[0]!.x && slowRim[0]!.x < 620);
+  assert.ok(Math.abs(slowRim[0]!.x - (500 + 120 * 0.97 ** 0.7)) < 1e-10);
+  const before = structuredClone(slowRim);
+  paint(slowRim, 1000, 800, null, false, 0.7);
+  assert.deepEqual(slowRim, before, '减速不能改变即时释放时的位置');
+});

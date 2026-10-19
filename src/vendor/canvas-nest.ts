@@ -24,15 +24,18 @@ export function createCanvasNestFrame(ctx: CanvasRenderingContext2D) {
     height: number,
     cursor: Position | null,
     advance = true,
+    step = 1,
   ) {
     ctx.clearRect(0, 0, width, height);
+    // Only the time scale changes; step=1 remains exactly the reference.
+    const pull = step === 1 ? 0.03 : -Math.expm1(Math.log1p(-0.03) * step);
     remaining.length = 0;
     if (cursor) remaining.push(cursor);
     remaining.push(...points);
     for (const point of points) {
       if (advance) {
-        point.x += point.vx;
-        point.y += point.vy;
+        point.x += point.vx * step;
+        point.y += point.vy * step;
         point.vx *= point.x > width || point.x < 0 ? -1 : 1;
         point.vy *= point.y > height || point.y < 0 ? -1 : 1;
       }
@@ -47,8 +50,8 @@ export function createCanvasNestFrame(ctx: CanvasRenderingContext2D) {
         const range = neighbour === cursor ? 20000 : 6000;
         if (distance >= range) continue;
         if (advance && neighbour === cursor && distance >= range / 2) {
-          point.x -= 0.03 * dx;
-          point.y -= 0.03 * dy;
+          point.x -= pull * dx;
+          point.y -= pull * dy;
         }
         const strength = (range - distance) / range;
         ctx.beginPath();
