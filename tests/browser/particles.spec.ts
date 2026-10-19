@@ -118,14 +118,14 @@ test('周围原有粒子逐渐移入并连接，卡片区域立即消散', async
   ).toBe(true);
   expect(initial.dots).toBe(120);
   expect(initial.minimumDotOpacity).toBe(1);
-  await page.clock.runFor(800);
+  await page.clock.runFor(1400);
   const growing = await read();
   expect(growing.spokes).toBeGreaterThan(initial.spokes);
   expect(growing.spokes).toBeLessThan(32);
   expect(growing.opacity).toBe(1);
-  await page.clock.runFor(2400);
+  await page.clock.runFor(4000);
   expect((await read()).spokes).toBeGreaterThan(growing.spokes);
-  await page.clock.runFor(4600);
+  await page.clock.runFor(7400);
   expect((await read()).spokes).toBe(32);
   expect(Math.max(...(await read()).radii)).toBeLessThan(103);
   await backgroundOnly.evaluate((style) =>

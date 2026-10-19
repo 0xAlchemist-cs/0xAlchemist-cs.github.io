@@ -18,6 +18,8 @@ interface Position {
 const particleRangeSquared = 6000;
 const cursorRangeSquared = 20000;
 const captureRadius = 320;
+const maximumCapturedParticles = 48;
+const gatheringPace = 0.65;
 const frameDuration = 1000 / 60;
 const contentSurfaces =
   '.article-card, .project-card, .hero, .side-panel, .article-paper, .paper, .toc, .empty-state, .topic-card, .archive-row, .search-container, img, video, a, button, input, textarea, select, [data-background-static]';
@@ -269,7 +271,11 @@ export function createParticleSimulation() {
           if (!members.has(point)) {
             advanceParticle(point, width, height, delta);
             const distance = Math.hypot(point.x - cursor.x, point.y - cursor.y);
-            if (moved && members.size < 56 && distance < captureRadius) {
+            if (
+              moved &&
+              members.size < maximumCapturedParticles &&
+              distance < captureRadius
+            ) {
               members.add(point);
               homes.set(point, { ...point });
               radii.set(point, 100 + Math.sin(members.size * 2.399963) * 2);
@@ -285,8 +291,9 @@ export function createParticleSimulation() {
           // Pull existing nearby nodes in slowly. Never clamp a distant node
           // onto the rim: its changing position must explain every new edge.
           const outer = rimTransition(radius);
-          const speed = (0.22 + 0.58 * outer) * delta;
-          const response = 0.06 * settling * (1 - outer) + 0.025 * outer;
+          const speed = (0.22 + 0.58 * outer) * delta * gatheringPace;
+          const response =
+            (0.06 * settling * (1 - outer) + 0.025 * outer) * gatheringPace;
           const change = Math.max(
             -speed,
             Math.min(speed, (target - radius) * -Math.expm1(-response * delta)),
@@ -370,7 +377,7 @@ export function createParticleRenderer(ctx: CanvasRenderingContext2D) {
     ctx.globalAlpha = 1;
     // Keep triangles with fewer long cross-links in the collected mesh.
     const meshRangeSquared = interaction
-      ? 0.72 *
+      ? 0.55 *
         Math.max(
           particleRangeSquared,
           Math.min(
