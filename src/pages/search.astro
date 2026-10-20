@@ -31,10 +31,17 @@ import '@pagefind/default-ui/css/ui.css';
   import { PagefindUI } from '@pagefind/default-ui';
   const status = document.querySelector<HTMLElement>('#search-status');
   try {
-    const response = await fetch('/pagefind/pagefind.js', { method: 'HEAD' });
-    if (!response.ok) throw new Error('Index unavailable');
+    const responses = await Promise.all(
+      ['/pagefind/pagefind.js', '/search-api/pagefind.js'].map((path) =>
+        fetch(path, { method: 'HEAD' }),
+      ),
+    );
+    if (responses.some((response) => !response.ok))
+      throw new Error('Index unavailable');
     new PagefindUI({
       element: '#search',
+      bundlePath: '/search-api/',
+      excerptLength: 32,
       showSubResults: true,
       showImages: false,
       translations: {

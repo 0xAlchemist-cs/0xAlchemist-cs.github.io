@@ -57,7 +57,7 @@ const visible = {
 };
 await writeFile(
   join(root, 'src/content/posts/integration-visible.md'),
-  `---\n${stringify(visible)}---\n\n## 中文检索\n\n知识花园里的量子炼金术，用于测试中文搜索。\n\n## 可复制代码\n\n\u0060\u0060\u0060ts\nconst answer = 42;\n\u0060\u0060\u0060\n\n[关联项目](/projects/integration-project/)\n`,
+  `---\n${stringify(visible)}---\n\n## 中文检索\n\n知识花园里的量子炼金术，用于测试中文搜索。回忆在这里，放下在那边。Python 也出现在这里，但不是那个连续词。\n\n## 可复制代码\n\n\u0060\u0060\u0060ts\nconst answer = 42;\n\u0060\u0060\u0060\n\n[关联项目](/projects/integration-project/)\n`,
 );
 for (let index = 0; index < 8; index++) {
   const data = {
@@ -75,7 +75,7 @@ for (let index = 0; index < 8; index++) {
 }
 await writeFile(
   join(root, 'src/content/projects/integration-project.md'),
-  `---\n${stringify({ slug: 'integration-project', repoFullName: 'test-owner/test-repo', displayName: '关联项目集成测试', summary: '仅存在于隔离构建中的项目，用于验证文章与项目双向关联。', techStack: ['TypeScript'], featured: true, relatedPosts: [] })}---\n\n## 测试项目\n\n用于隔离构建，绝不发布。\n`,
+  `---\n${stringify({ slug: 'integration-project', repoFullName: 'test-owner/test-repo', displayName: '关联项目集成测试', summary: '仅存在于隔离构建中的项目，用于验证文章与项目双向关联。', techStack: ['TypeScript'], featured: true, relatedPosts: [] })}---\n\n## 测试项目\n\nPython 图文信号回放，连接事件与结果。通过复习检查长短词。用于隔离构建，绝不发布。\n`,
 );
 function run(args: string[]) {
   const result = spawnSync(process.execPath, args, {
