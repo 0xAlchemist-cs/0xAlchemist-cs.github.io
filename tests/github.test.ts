@@ -41,6 +41,27 @@ test('仅请求精选仓库，清除响应中的其他字段', async () => {
   assert.equal(JSON.stringify(result.cache).includes('do-not-retain'), false);
   assert.equal(JSON.stringify(result.cache).includes('readme_html'), false);
 });
+test('公开字段没有变化时保留原快照，避免仅刷新日期的空更新', async () => {
+  const result = await refreshRepos(
+    ['owner/public'],
+    old,
+    mock(() => Response.json({ ...data, ignored_field: 'not-public-cache' })),
+  );
+  assert.deepEqual(result.cache, old);
+  assert.equal(result.errors.length, 0);
+});
+test('公开字段变化时保存新快照及真实获取时间', async () => {
+  const result = await refreshRepos(
+    ['owner/public'],
+    old,
+    mock(() => Response.json({ ...data, stargazers_count: 4 })),
+  );
+  assert.equal(result.cache.repos['owner/public']!.data.stargazers_count, 4);
+  assert.notEqual(
+    result.cache.repos['owner/public']!.fetchedAt,
+    old.repos['owner/public']!.fetchedAt,
+  );
+});
 for (const status of [404, 429, 500])
   test(`HTTP ${status} 保留有效缓存，首次构建保持手工回退`, async () => {
     const fetcher = mock(() => new Response('', { status }));

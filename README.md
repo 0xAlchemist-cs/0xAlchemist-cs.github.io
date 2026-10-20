@@ -36,7 +36,9 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 preview
 
 身份配置位于 `src/config/site.ts`；域名也配置在 `astro.config.mjs`。更换账号时同时更新配置、部署说明和测试中固定 URL，再运行检查。用户主页仓库不设置额外 base，页面统一结尾斜杠，文件型端点除外。
 
-评论、AI 服务、统计追踪均未启用，无须外部 Key。GitHub Token 仅用于手动公开项目同步，不传入站点构建。搜索平台注册与验证是可选操作，不保证收录、排名或 AI 引用。
+精选项目展示 IELTS Workspace 和 Signal Vision Backtest，项目页与介绍文章双向关联并链接公开源码。公开元数据可手动刷新，也可每周由 Actions 创建待审核 PR；无变化不创建空更新，作者确认合并后才部署。详见部署指南中的同步权限与 `dry_run` 验收说明。
+
+评论、AI 服务、统计追踪均未启用，无须外部 Key。GitHub Token 仅供公开资料同步及元数据 PR 任务使用，不传入站点构建。搜索平台注册与验证是可选操作，不保证收录、排名或 AI 引用。
 
 ## 原始资料
 
