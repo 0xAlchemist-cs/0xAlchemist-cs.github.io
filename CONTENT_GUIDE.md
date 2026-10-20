@@ -66,9 +66,21 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 sync:github
 powershell -ExecutionPolicy Bypass -File scripts/project.ps1 format
 ```
 
-只请求已精选、非草稿、非示例项目。无 Token 可尝试公开 API；超时、断网或限流时保留有效缓存，首次失败则使用手工资料，不编造 Star。成功数据注明获取日期。
+只请求已精选、非草稿、非示例项目。无 Token 可尝试公开 API；超时、断网或限流时保留有效缓存，首次失败则使用手工资料，不编造 Star。成功数据注明快照获取日期；公开字段没有变化时保留原快照及日期，避免只有时间变化的更新。
 
-审查缓存差异后通过 PR 提交。GitHub 手动同步工作流只上传 artifact，不自动提交或合并；没有定时写入任务。取消精选后再次同步会清理对应缓存。
+当前精选项目为 `ielts-workspace` 和 `signal-vision-backtest`；配置、介绍文章、项目页与 GitHub 链接均可单独维护。取消精选后再次同步会清理对应缓存。
+
+GitHub Actions 的 **Review public project metadata** 每周一北京时间约 09:17 检查，也可手动运行。只读任务使用 `--strict`：任一仓库同步失败时保留原文件并失败退出；校验、构建和产物审计通过后，才把缓存交给单独的写入任务。
+
+写入任务只提交 `src/data/github-public-cache.json`，复用 `codex/refresh-public-metadata` 分支与同一待审核 PR，不自动合并。无有效差异时不创建空 PR。创建或更新 PR 后会显式触发该分支的完整 CI；作者审核并确认合并后，走正常部署门禁。
+
+手动运行时可选 `dry_run`，仅检查并保存 Artifact，适合验证新配置。该模式也允许在功能分支运行；创建 PR 的任务只允许在 `main` 运行。日常本地同步仍允许有效缓存回退；需要严格失败时在 npm 命令后添加 `-- --strict`。
+
+### 中文检索规则
+
+连续中文按完整短语查找，例如“回放”“图文信号回放”；空格分开的关键词可位于正文不同位置，例如 `Python 回放`。加英文双引号要求整个短语连续，例如 `"Python 回放"`。纯英文查询沿用 Pagefind 的处理。
+
+构建只在搜索索引副本中统一中文字边界，站点正文、元数据和锚点不变；查询适配层对中文短语分别搜索，并以页面交集实现组合查询，避免不同浏览器分词造成漏检或将“回忆……放弃”误作“回放”。结果标题会去掉索引专用的不可见分隔符。无需外部服务或额外依赖，底层仍使用 [Pagefind](https://pagefind.app/docs/multilingual/)。
 
 ## 日常发布
 

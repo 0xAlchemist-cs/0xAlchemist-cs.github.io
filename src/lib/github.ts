@@ -68,10 +68,11 @@ export async function refreshRepos(
       const data = publicRepoSchema.parse(await response.json());
       if (data.full_name.toLowerCase() !== name.toLowerCase())
         throw new Error('Repository identity mismatch');
-      next.repos[name.toLowerCase()] = {
-        fetchedAt: new Date().toISOString(),
-        data,
-      };
+      const key = name.toLowerCase();
+      // Keep the existing snapshot if public fields did not change. A routine
+      // recheck should not create a PR whose only change is its timestamp.
+      if (JSON.stringify(next.repos[key]?.data) !== JSON.stringify(data))
+        next.repos[key] = { fetchedAt: new Date().toISOString(), data };
     } catch {
       // Never log a response, exception message, or token; preserve validated data only.
       errors.push(`${name}: 同步失败，保留有效缓存或使用手工配置。`);

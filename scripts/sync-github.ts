@@ -26,7 +26,12 @@ if (errors.length) {
       process.env.GITHUB_TOKEN,
     );
     result.errors.forEach((message) => console.warn(message));
-    if (JSON.stringify(result.cache) !== JSON.stringify(parsed.data)) {
+    const rejected =
+      process.argv.includes('--strict') && result.errors.length > 0;
+    if (rejected) {
+      console.error('严格同步失败，原缓存未修改。');
+      process.exitCode = 1;
+    } else if (JSON.stringify(result.cache) !== JSON.stringify(parsed.data)) {
       const temporary = `${path}.tmp`;
       await writeFile(temporary, JSON.stringify(result.cache, null, 2) + '\n');
       await rename(temporary, path);

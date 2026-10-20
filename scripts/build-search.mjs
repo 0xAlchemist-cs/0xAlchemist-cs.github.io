@@ -1,44 +1,61 @@
-import { readdir, readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
-import { parse } from 'node-html-parser';
+import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
+import { join, relative, sep } from 'node:path';
+import { createIndex, close } from 'pagefind';
+import ts from 'typescript';
+import { searchHTML } from './search-html.mjs';
 
-async function hasSearchableContent(directory) {
+async function htmlFiles(directory) {
+  const files = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
-    if (entry.isDirectory() && (await hasSearchableContent(path))) return true;
-    if (
-      entry.isFile() &&
-      entry.name.endsWith('.html') &&
-      parse(await readFile(path, 'utf8')).querySelector('[data-pagefind-body]')
-    )
-      return true;
+    if (entry.isDirectory()) files.push(...(await htmlFiles(path)));
+    else if (entry.name.endsWith('.html')) files.push(path);
   }
-  return false;
+  return files;
 }
-// A newly created site has no real content. Do not index its navigation or make
-// that intentional empty state a build failure. Astro clears dist before build.
-if (!(await hasSearchableContent('dist'))) {
+const pages = [];
+for (const path of await htmlFiles('dist')) {
+  const content = searchHTML(await readFile(path, 'utf8'));
+  if (content !== null) pages.push({ path, content });
+}
+if (!pages.length) {
   console.log(
     '没有公开文章或项目，跳过全文索引；空状态构建正常，发布门禁仍要求真实文章。',
   );
 } else {
-  const packageRoot = new URL('../node_modules/pagefind/', import.meta.url);
-  const manifest = JSON.parse(
-    await readFile(new URL('package.json', packageRoot), 'utf8'),
-  );
-  const result = spawnSync(
-    process.execPath,
-    [
-      fileURLToPath(new URL(manifest.bin, packageRoot)),
-      '--site',
-      'dist',
-      '--root-selector',
-      '[data-pagefind-body]',
-    ],
-    { stdio: 'inherit' },
-  );
-  if (result.error || result.status !== 0)
-    process.exitCode = result.status ?? 1;
+  try {
+    const { index, errors } = await createIndex({
+      rootSelector: '[data-pagefind-body]',
+    });
+    if (!index || errors.length) throw new Error(errors.join('\n'));
+    for (const { path, content } of pages) {
+      const url =
+        '/' +
+        relative('dist', path)
+          .split(sep)
+          .join('/')
+          .replace(/index\.html$/, '');
+      const result = await index.addHTMLFile({ url, content });
+      if (result.errors.length) throw new Error(result.errors.join('\n'));
+    }
+    const result = await index.writeFiles({ outputPath: 'dist/pagefind' });
+    if (result.errors.length) throw new Error(result.errors.join('\n'));
+    const source = await readFile('src/lib/search-api.ts', 'utf8');
+    const output = ts.transpileModule(source, {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.ES2022,
+        removeComments: true,
+      },
+      reportDiagnostics: true,
+    });
+    if (output.diagnostics?.length) throw new Error('搜索适配模块编译失败。');
+    await mkdir('dist/search-api', { recursive: true });
+    await writeFile('dist/search-api/pagefind.js', output.outputText);
+    console.log(
+      `Pagefind: indexed ${pages.length} public pages with consistent Han-character boundaries.`,
+    );
+  } finally {
+    await close();
+  }
 }

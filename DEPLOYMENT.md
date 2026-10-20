@@ -22,11 +22,23 @@
 
 ## 自动化边界
 
-- PR 和 main push 运行 CI。
+- PR 和 main push 运行 CI，也支持 `workflow_dispatch` 对指定分支显式运行同一套检查。
 - 发布仅允许 main；部署依赖自己的同一提交质量任务，不假设独立 CI 已先完成。
 - 共享检查执行 Node 22.22.0、npm ci、类型/格式/单测/内容与产物审计/构建、桌面和手机浏览器测试。报告保留七天。
 - 发布使用串行 pages 并发组，避免旧任务在新任务之后覆盖网站。
-- Token 只用于手动公开项目同步，外部 PR 不注入自定义 Secrets，不使用 `pull_request_target`。
+- 公开项目刷新任务仅有读取权限。单独的 PR 任务获得 `contents: write`、`pull-requests: write` 和 `actions: write`，用于提交指定缓存文件、创建待审核 PR 和触发 CI；站点构建不接收 Token。外部 PR 不注入自定义 Secrets，不使用 `pull_request_target`。
+
+## 精选项目自动同步
+
+`sync-github.yml` 每周一 01:17 UTC（北京时间 09:17）或手动触发，计划任务可能延迟。流程为：严格同步公开资料 → 本地同等 `verify` → 保存已验证缓存 → 创建或更新元数据 PR → 显式触发 PR 分支的完整 CI → 作者确认合并 → 正常部署。
+
+需在 Settings → Actions → General → Workflow permissions 开启 **Allow GitHub Actions to create and approve pull requests**。保持默认 Token 权限为只读，写权限仅由对应任务声明。此仓库不会自动批准或合并 PR；该设置是 GitHub 提供的创建 PR 开关，不代表启用自动审核。
+
+无需额外 PAT 或付费服务。自动 PR 事件可能等待工作流批准，因此使用内置 `GITHUB_TOKEN` 显式触发 `ci.yml` 的 `workflow_dispatch`；检查使用元数据分支的同一提交。未通过检查的更新不应合并，部署还会再次检查实际 `main` 提交。
+
+人工验收新工作流时，在 Actions 选择该工作流和功能分支，勾选 `dry_run`。应看到 `refresh` 成功、`review` 跳过，并可下载 `validated-public-cache`。正式启用后，API 无变化应保持文件与 PR 不变；API 超时、限流或无效响应应令严格任务失败，站点继续使用已提交缓存。
+
+可只手动运行，或从工作流中移除 `schedule` 停止定期刷新。维护 PR 使用固定专用分支 `codex/refresh-public-metadata`，不要在该分支编写文章或功能代码。手工精选列表仍以 `src/content/projects/` 的非草稿、非示例配置为准。
 
 ## 线上验收
 

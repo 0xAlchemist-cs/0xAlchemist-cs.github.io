@@ -7,6 +7,7 @@ import { posts, projects, topicGroups } from '../lib/content';
 const all = await posts();
 const selected = (await projects())
   .filter((project) => project.data.featured)
+  .sort((a, b) => Number(a.data.example) - Number(b.data.example))
   .slice(0, 2);
 const featured = all.find((post) => post.data.featured);
 const display = featured

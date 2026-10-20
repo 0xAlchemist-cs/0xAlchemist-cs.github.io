@@ -1,12 +1,24 @@
 name: Review public project metadata
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '校验并保存产物，暂不创建或更新 PR'
+        type: boolean
+        default: false
+  schedule:
+    # Monday 09:17 in Asia/Shanghai. GitHub may delay scheduled runs.
+    - cron: '17 1 * * 1'
 permissions:
   contents: read
+concurrency:
+  group: public-project-metadata
+  cancel-in-progress: false
 jobs:
   refresh:
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.dry_run)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
         with:
@@ -16,11 +28,52 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
-      - run: npm run sync:github
+      - run: npm run sync:github -- --strict
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      - run: npm run verify
       - uses: actions/upload-artifact@v7
         with:
-          name: reviewed-public-cache
+          name: validated-public-cache
           path: src/data/github-public-cache.json
           retention-days: 7
+  review:
+    needs: refresh
+    if: github.ref == 'refs/heads/main' && !inputs.dry_run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: validated-public-cache
+          path: src/data
+      - name: Create or update the metadata review PR
+        id: cache-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          token: ${{ github.token }}
+          branch: codex/refresh-public-metadata
+          base: main
+          add-paths: src/data/github-public-cache.json
+          commit-message: 'Refresh validated public project metadata'
+          title: '更新精选项目的公开 GitHub 元数据'
+          body: |
+            仅刷新已手工精选的公开项目资料，缓存已通过严格同步、内容校验、构建与产物检查。
+            API 失败时不会提交部分更新；公开字段不变时保留原快照，避免日期噪声。
+            此 PR 不自动合并。请等待 CI，通过审核后由作者确认合并发布。
+      - name: Run CI explicitly for the automation commit
+        if: steps.cache-pr.outputs.pull-request-number && (steps.cache-pr.outputs.pull-request-operation == 'created' || steps.cache-pr.outputs.pull-request-operation == 'updated')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        # GITHUB_TOKEN events can require approval; workflow_dispatch runs CI
+        # without a PAT, with the same quality checks on the PR branch.
+        run: gh workflow run ci.yml --ref codex/refresh-public-metadata

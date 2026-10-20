@@ -1,4 +1,31 @@
 {
   "version": 1,
-  "repos": {}
+  "repos": {
+    "0xalchemist-cs/ielts-workspace": {
+      "fetchedAt": "2026-10-20T14:59:22.174Z",
+      "data": {
+        "full_name": "0xAlchemist-cs/ielts-workspace",
+        "html_url": "https://github.com/0xAlchemist-cs/ielts-workspace",
+        "private": false,
+        "description": null,
+        "language": "TypeScript",
+        "topics": [],
+        "stargazers_count": 0,
+        "updated_at": "2026-10-18T15:52:28Z"
+      }
+    },
+    "0xalchemist-cs/signal-vision-backtest": {
+      "fetchedAt": "2026-10-20T14:59:22.678Z",
+      "data": {
+        "full_name": "0xAlchemist-cs/signal-vision-backtest",
+        "html_url": "https://github.com/0xAlchemist-cs/signal-vision-backtest",
+        "private": false,
+        "description": "AI vision signal parser + second-level backtest engine for Discord trading channels (GLM/Qwen-VL/GPT-4o compatible)",
+        "language": "Python",
+        "topics": [],
+        "stargazers_count": 3,
+        "updated_at": "2026-10-16T04:10:08Z"
+      }
+    }
+  }
 }
