@@ -234,3 +234,81 @@ test('七成速度同时放慢漂移和吸附，保留原站距离与绘制规�
   paint(slowRim, 1000, 800, null, false, 0.7);
   assert.deepEqual(slowRim, before, '减速不能改变即时释放时的位置');
 });
+
+test('轻柔聚拢减少边缘跳动，同时保留微动与远处粒子的原有运动', () => {
+  const capture = recorder();
+  const paint = createCanvasNestFrame(capture.context, {
+    gentleCollection: true,
+  });
+  const points = [
+    { x: 600, y: 450, vx: 0.5, vy: 0 },
+    { x: 850, y: 450, vx: -0.25, vy: 0.125 },
+  ];
+  const radii: number[] = [];
+  for (let frame = 0; frame < 240; frame++) {
+    capture.calls.length = 0;
+    paint(points, 1200, 900, { x: 500, y: 450 }, true, 0.7);
+    if (frame >= 120) radii.push(points[0]!.x - 500);
+  }
+  const variation = Math.max(...radii) - Math.min(...radii);
+  assert.ok(variation < 1.8, `边缘跳动应小于原版约2.1px，实际${variation}`);
+  assert.ok(variation > 0.4, '仍保留原站的轻微自然抖动');
+  assert.ok(Math.abs(points[1]!.x - 808) < 1e-9);
+  assert.ok(Math.abs(points[1]!.y - 471) < 1e-9);
+});
+
+test('轻柔聚拢逐步缩小大缺口，保留疏密与真实粒子', () => {
+  const capture = recorder();
+  const paint = createCanvasNestFrame(capture.context, {
+    gentleCollection: true,
+  });
+  const cursor = { x: 500, y: 450 };
+  const points = [
+    -155, -125, -95, -65, -35, -5, 25, 55, 85, 85.5, 86, 86.5,
+  ].map((degrees) => ({
+    x: cursor.x + Math.cos((degrees * Math.PI) / 180) * 99.5,
+    y: cursor.y + Math.sin((degrees * Math.PI) / 180) * 99.5,
+    vx: 0,
+    vy: 0,
+  }));
+  const gaps = () => {
+    const angles = points
+      .map((point) => Math.atan2(point.y - cursor.y, point.x - cursor.x))
+      .sort((a, b) => a - b);
+    return angles.map((angle, index) =>
+      index + 1 < angles.length
+        ? angles[index + 1]! - angle
+        : angles[0]! + 2 * Math.PI - angle,
+    );
+  };
+  const before = Math.max(...gaps());
+  const initial = structuredClone(points);
+  paint(points, 1200, 900, cursor, true, 0.7);
+  assert.ok(
+    points.every(
+      (point, index) =>
+        Math.hypot(point.x - initial[index]!.x, point.y - initial[index]!.y) <
+        0.7,
+    ),
+    '调整应逐帧进行，不能瞬移补齐缺口',
+  );
+  for (let frame = 1; frame < 1200; frame++) {
+    capture.calls.length = 0;
+    paint(points, 1200, 900, cursor, true, 0.7);
+  }
+  const after = gaps();
+  assert.ok(Math.max(...after) < before * 0.8, '大缺口应逐步收窄');
+  assert.ok(Math.max(...after) > Math.min(...after) * 1.15, '允许自然疏密');
+  assert.equal(points.length, initial.length, '不能新建粒子补洞');
+  assert.ok(
+    points.every(
+      (point) =>
+        Math.abs(Math.hypot(point.x - 500, point.y - 450) - 99.5) < 0.01,
+    ),
+  );
+  const released = structuredClone(points);
+  paint(points, 1200, 900, null, false, 0.7);
+  assert.deepEqual(points, released, '释放不能继续分配或重置位置');
+  paint(points, 1200, 900, { x: 1000, y: 450 }, true, 0.7);
+  assert.deepEqual(points, released, '旧圈不受远处鼠标影响');
+});

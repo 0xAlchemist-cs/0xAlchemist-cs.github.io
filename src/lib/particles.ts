@@ -8,7 +8,7 @@ export function startBackground(canvas: HTMLCanvasElement) {
   const context = canvas.getContext('2d');
   if (!context) return;
   const ctx = context;
-  const paint = createCanvasNestFrame(ctx);
+  const paint = createCanvasNestFrame(ctx, { gentleCollection: true });
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const fine = window.matchMedia('(pointer: fine)');
   let width = 0;
