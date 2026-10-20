@@ -1,7 +1,7 @@
 canvas-nest.js
 https://github.com/hustcc/canvas-nest.js
 
-The particle background adapts the motion and drawing algorithm used at
+The particle background includes a direct TypeScript port of the script used at
 https://siaimes.github.io/lib/canvas-nest/canvas-nest.min.js
 
 The MIT License (MIT)
