@@ -17,4 +17,6 @@ export interface SearchVerification {
 }
 
 // Add the verification values supplied by each platform when ready.
-export const searchVerification: SearchVerification = {};
+export const searchVerification: SearchVerification = {
+  google: 'eZfeEKkpApwVv3cDNgrxMAxToqsLpzX2atf2isQKdmI',
+};

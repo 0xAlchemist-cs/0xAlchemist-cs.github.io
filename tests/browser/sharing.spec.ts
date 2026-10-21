@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { searchVerification } from '../../src/config/site';
 
 const fixture = 'http://127.0.0.1:4322';
 
@@ -125,9 +126,13 @@ test('验证配置仅在配置后输出一次，普通页面保留默认分享�
     'https://0xalchemist-cs.github.io/images/default-og.png',
   );
   await page.goto('http://127.0.0.1:4321/');
-  await expect(
-    page.locator(
-      'meta[name="google-site-verification"],meta[name="msvalidate.01"]',
-    ),
-  ).toHaveCount(0);
+  for (const [platform, name] of [
+    ['google', 'google-site-verification'],
+    ['bing', 'msvalidate.01'],
+  ] as const) {
+    const value = searchVerification[platform]?.trim();
+    const tags = page.locator(`meta[name="${name}"]`);
+    await expect(tags).toHaveCount(value ? 1 : 0);
+    if (value) await expect(tags).toHaveAttribute('content', value);
+  }
 });
