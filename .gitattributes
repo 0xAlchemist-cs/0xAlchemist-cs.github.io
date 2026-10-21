@@ -1,3 +1,6 @@
+# Match Prettier's LF output on Windows and Ubuntu checkouts.
+* text=auto eol=lf
+
 # Approved artwork and provenance are hash-verified; never convert their bytes.
 assets/share-art/** -text
 # Preserve the upstream font license verbatim, including original whitespace.
