@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "title": {
+    "left": 64,
+    "top": 210,
+    "width": 480,
+    "height": 120,
+    "fontSize": 64,
+    "color": "#22374c",
+    "font": "wenkai"
+  },
+  "author": {
+    "left": 68,
+    "top": 518,
+    "width": 420,
+    "height": 38,
+    "fontSize": 24,
+    "color": "#41556e"
+  },
+  "site": {
+    "left": 68,
+    "top": 561,
+    "width": 460,
+    "height": 26,
+    "fontSize": 18,
+    "color": "#647991"
+  }
+}

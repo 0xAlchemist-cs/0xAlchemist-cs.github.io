@@ -52,10 +52,28 @@
 
 用新 PR 执行 `git revert <出问题的提交SHA>`，检查通过后合并重新部署。不要 reset 主分支或强推。同步失败保留缓存，构建失败保留上次成功站点，不跳过检查强行发布。
 
-## 搜索平台（可选）
+## 搜索平台接入准备
 
-上线后在 Search Console 添加 URL 前缀属性 `https://0xalchemist-cs.github.io/`。按界面要求将验证 HTML 加入 `public/` 或将验证 meta 加入 SEO Head，正常 PR 发布。
+本轮仅完成网站侧配置与审计。Google／Bing 登录、站点所有权验证、Sitemap 提交及后台收录检查均为**待完成**；本地标签检查不能证明平台验证成功。
 
-验证通过后提交实际 Sitemap 索引，用 URL 检查看抓取情况。Bing 同理。没有启用 IndexNow、AI API 或统计服务。技术要素齐全不保证排名、收录或 AI 引用。
+准备好账号后按以下顺序操作：
 
-参考：[Astro 官方部署](https://docs.astro.build/en/guides/deploy/github/)、[GitHub Pages 入门](https://docs.github.com/en/pages/quickstart)。
+1. 登录 Google Search Console，添加 **URL 前缀**属性 `https://0xalchemist-cs.github.io/`，选择 HTML 标签验证；Bing Webmaster Tools 独立添加同一站点，选择 HTML meta 标签验证。当前方案使用现有 GitHub Pages 地址，无须配置 DNS。
+2. 在 `src/config/site.ts` 中为 `searchVerification` 填入平台标签的 `content` 值：`google` 对应 `google-site-verification`，`bing` 对应 `msvalidate.01`。只复制验证值，不复制整段 HTML；未准备的项省略，空白项不输出标签。
+3. 通过正常分支／PR 检查和作者确认后发布，在实际线上首页源码中核实标签存在、值正确且没有重复，再返回各平台点击验证。验证值须持续保留，后续发布也会检查是否正常输出。
+4. 分别提交 `https://0xalchemist-cs.github.io/sitemap-index.xml`，检查其实际列出的子 Sitemap 可访问；用平台 URL 检查工具查看首页、文章和项目页的抓取／收录状态，记录实际结果。
+5. 将平台结果与日期另行补入验收记录。当前审计报告里的平台操作状态固定为“未执行”，不会根据静态标签推断后台结果。
+
+`searchVerification` 缺省为空，不在源码中存放账号登录信息。平台验证标签本来就会出现在公开 HTML 中；它与账号密码、API 密钥不同。
+
+## 分享图验收
+
+`build` 在 Astro 静态构建期间生成 `/og/` PNG，字体与授权随仓库提供，仅用于构建，不进入公开产物。`verify` 的产物审计检查图片可解码、1200×630 尺寸、OG／Twitter／文章 JSON-LD 图片一致、验证标签与配置一致，并生成 JSON／Markdown 及离线分享预览。
+
+本地确认 `reports/share-preview.html` 中的真实文章和项目卡片后提交 PR。合并部署成功后，检查线上页面元数据，以及它引用的图片是否返回 HTTP 200、`image/png` 和正确尺寸。草稿、示例、字体文件不应出现在公开产物，图片资源不应出现在页面 Sitemap 或 RSS。
+
+按全文设计的 AI 图使用 [AI 配图工作流](docs/AI_SHARE_ART.md)：创作与候选在 Codex 本地会话完成，最终 PNG 经作者确认后才进入 `assets/share-art/`；合并发布仍单独确认。CI 完全离线校验并输出已确认文件的原始字节，不调用模型。候选、原图、简报和提示词不进入公开站点；清单错误令检查失败，正文变化提示人工复核并保留旧图。
+
+本轮验收通用 OG／Twitter Card 信息及图片，不将微信、QQ、X 或 LinkedIn 的特定客户端缓存和展示效果作为门禁。没有启用 IndexNow、AI API 或统计服务。技术要素齐全不保证排名、收录或 AI 引用。
+
+参考：[Google 所有权验证](https://support.google.com/webmasters/answer/9008080)、[Bing 添加与验证站点](https://www.bing.com/webmasters/help/add-and-verify-site-12184f8b)、[Open Graph 协议](https://ogp.me/)、[Astro 官方部署](https://docs.astro.build/en/guides/deploy/github/)。

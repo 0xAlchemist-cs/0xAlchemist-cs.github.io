@@ -1,4 +1,13 @@
-import { absolute, site } from '../config/site';
+import { absolute, site, type SearchVerification } from '../config/site';
+import type { SocialImage } from './social-card';
+
+export function searchVerificationTags(config: SearchVerification) {
+  return [
+    { name: 'google-site-verification', content: config.google?.trim() ?? '' },
+    { name: 'msvalidate.01', content: config.bing?.trim() ?? '' },
+  ].filter((tag) => tag.content !== '');
+}
+
 export function breadcrumbs(items: { name: string; path: string }[]) {
   return {
     '@type': 'BreadcrumbList',
@@ -12,15 +21,18 @@ export function breadcrumbs(items: { name: string; path: string }[]) {
     ),
   };
 }
-export function articleSchema(data: {
-  title: string;
-  description: string;
-  slug: string;
-  publishedAt: Date;
-  updatedAt?: Date;
-  cover?: string;
-  canonical?: string;
-}) {
+export function articleSchema(
+  data: {
+    title: string;
+    description: string;
+    slug: string;
+    publishedAt: Date;
+    updatedAt?: Date;
+    cover?: string;
+    canonical?: string;
+  },
+  image: SocialImage,
+) {
   return {
     '@type': 'BlogPosting',
     headline: data.title,
@@ -34,7 +46,7 @@ export function articleSchema(data: {
       url: absolute('/about/'),
     },
     mainEntityOfPage: data.canonical ?? absolute(`/blog/${data.slug}/`),
-    image: absolute(data.cover ?? '/images/default-og.png'),
+    image: absolute(image.src),
     inLanguage: site.language,
   };
 }

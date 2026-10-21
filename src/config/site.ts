@@ -10,3 +10,11 @@ export const site = {
 } as const;
 
 export const absolute = (path = '/') => new URL(path, site.url).href;
+
+export interface SearchVerification {
+  google?: string;
+  bing?: string;
+}
+
+// Add the verification values supplied by each platform when ready.
+export const searchVerification: SearchVerification = {};

@@ -1,4 +1,5 @@
 import {
+  appendFile,
   cp,
   mkdir,
   mkdtemp,
@@ -10,6 +11,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { stringify } from 'yaml';
 import { parseFrontmatter, sourceFiles } from './content-files';
+import { writeApprovedArtFixture } from '../tests/fixtures/share-art';
 
 // Build real test content in a disposable, ignored workspace, never in the author's source tree.
 await mkdir('.tools', { recursive: true });
@@ -19,11 +21,16 @@ for (const file of [
   'src',
   'public',
   'scripts',
+  'assets',
   'astro.config.mjs',
   'tsconfig.json',
   'package.json',
 ])
   await cp(file, join(root, file), { recursive: true });
+await appendFile(
+  join(root, 'src/config/site.ts'),
+  '\nObject.assign(searchVerification, { google: " V12_TEST_GOOGLE_ONLY_IN_FIXTURE_9F6C ", bing: " V12_TEST_BING_ONLY_IN_FIXTURE_8D2B " });\n',
+);
 // Keep fixture pagination independent of the author's growing content library.
 // Only the disposable copies are hidden; source posts and projects stay intact.
 for (const collection of ['posts', 'projects']) {
@@ -54,6 +61,8 @@ const visible = {
   category: '搜索测试',
   tags: ['中文检索', 'Astro', 'C#', 'CI/CD', 'GitHub Pages'],
   relatedRepos: ['Test-Owner/Test-Repo', 'other-owner/other-public'],
+  cover: '/images/default-og.png',
+  coverAlt: '集成测试封面',
 };
 await writeFile(
   join(root, 'src/content/posts/integration-visible.md'),
@@ -77,6 +86,13 @@ await writeFile(
   join(root, 'src/content/projects/integration-project.md'),
   `---\n${stringify({ slug: 'integration-project', repoFullName: 'test-owner/test-repo', displayName: '关联项目集成测试', summary: '仅存在于隔离构建中的项目，用于验证文章与项目双向关联。', techStack: ['TypeScript'], featured: true, relatedPosts: [] })}---\n\n## 测试项目\n\nPython 图文信号回放，连接事件与结果。通过复习检查长短词。用于隔离构建，绝不发布。\n`,
 );
+// Synthetic geometry only; this exercises approved-file delivery, never a model
+// invocation or a real author approval. All files stay in this disposable root.
+await writeApprovedArtFixture(root, {
+  kind: 'blog',
+  slug: 'integration-visible',
+});
+
 function run(args: string[]) {
   const result = spawnSync(process.execPath, args, {
     cwd: root,
