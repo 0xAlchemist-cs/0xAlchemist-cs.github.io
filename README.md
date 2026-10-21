@@ -38,7 +38,11 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 preview
 
 精选项目展示 IELTS Workspace 和 Signal Vision Backtest，项目页与介绍文章双向关联并链接公开源码。公开元数据可手动刷新，也可每周由 Actions 创建待审核 PR；无变化不创建空更新，作者确认合并后才部署。详见部署指南中的同步权限与 `dry_run` 验收说明。
 
-评论、AI 服务、统计追踪均未启用，无须外部 Key。GitHub Token 仅供公开资料同步及元数据 PR 任务使用，不传入站点构建。搜索平台注册与验证是可选操作，不保证收录、排名或 AI 引用。
+正式文章与项目在构建时生成独立的 1200×630 中文分享图，统一浅色蓝白模板；文章正文封面独立维护。`audit:site` 同时生成 `reports/sharing.json`、`sharing.md` 和可离线打开的 `share-preview.html`，供检查元数据和分享卡片。
+
+Google／Bing 的验证值可选填入 `src/config/site.ts` 的 `searchVerification`，缺省不会输出占位标签。本轮仅准备网站侧能力：平台登录、所有权验证、Sitemap 提交和收录检查尚待完成，步骤见部署指南。
+
+评论、AI 服务、统计追踪均未启用，无须外部 Key。GitHub Token 仅供公开资料同步及元数据 PR 任务使用，不传入站点构建。搜索平台操作不保证收录、排名或 AI 引用。
 
 ## 原始资料
 

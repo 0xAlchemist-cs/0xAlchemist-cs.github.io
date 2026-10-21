@@ -14,6 +14,7 @@ import {
 } from '../../lib/content';
 import { topicSlug } from '../../lib/schemas';
 import { articleSchema, breadcrumbs } from '../../lib/seo';
+import { postCard } from '../../lib/social-card';
 export async function getStaticPaths() {
   return (await posts()).map((post) => ({
     params: { slug: post.data.slug },
@@ -24,6 +25,7 @@ interface Props {
   post: Post;
 }
 const { post } = Astro.props;
+const card = postCard(post.data);
 const { Content, headings } = await render(post);
 const all = await posts();
 const index = all.findIndex((entry) => entry.id === post.id);
@@ -54,8 +56,9 @@ const toc = headings.filter(
   title={post.data.title}
   description={post.data.description}
   canonical={post.data.canonical}
+  socialImage={card.image}
   schemas={[
-    articleSchema(post.data),
+    articleSchema(post.data, card.image),
     breadcrumbs([
       { name: '文章', path: '/blog/' },
       { name: post.data.title, path: `/blog/${post.data.slug}/` },

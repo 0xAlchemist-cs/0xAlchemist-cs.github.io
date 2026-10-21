@@ -5,6 +5,7 @@ import { parse } from 'node-html-parser';
 import { site } from '../src/config/site';
 import { loadContent } from './content-files';
 import { writeReport, type AuditReport } from './report';
+import { auditSharing, writeSharingReport } from './sharing-audit';
 
 async function walk(directory: string): Promise<string[]> {
   const files = await readdir(directory, { withFileTypes: true });
@@ -259,6 +260,7 @@ if (
 ) {
   try {
     await writeReport('seo-site', await auditGeneratedSite());
+    await writeSharingReport(await auditSharing());
   } catch {
     await writeReport('seo-site', {
       checked: 0,

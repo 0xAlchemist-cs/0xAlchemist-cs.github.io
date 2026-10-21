@@ -1,4 +1,5 @@
 import {
+  appendFile,
   cp,
   mkdir,
   mkdtemp,
@@ -19,11 +20,16 @@ for (const file of [
   'src',
   'public',
   'scripts',
+  'assets',
   'astro.config.mjs',
   'tsconfig.json',
   'package.json',
 ])
   await cp(file, join(root, file), { recursive: true });
+await appendFile(
+  join(root, 'src/config/site.ts'),
+  '\nObject.assign(searchVerification, { google: " V12_TEST_GOOGLE_ONLY_IN_FIXTURE_9F6C ", bing: " V12_TEST_BING_ONLY_IN_FIXTURE_8D2B " });\n',
+);
 // Keep fixture pagination independent of the author's growing content library.
 // Only the disposable copies are hidden; source posts and projects stay intact.
 for (const collection of ['posts', 'projects']) {
@@ -54,6 +60,8 @@ const visible = {
   category: '搜索测试',
   tags: ['中文检索', 'Astro', 'C#', 'CI/CD', 'GitHub Pages'],
   relatedRepos: ['Test-Owner/Test-Repo', 'other-owner/other-public'],
+  cover: '/images/default-og.png',
+  coverAlt: '集成测试封面',
 };
 await writeFile(
   join(root, 'src/content/posts/integration-visible.md'),

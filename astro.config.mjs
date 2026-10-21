@@ -21,7 +21,10 @@ export default defineConfig({
   },
   integrations: [
     mdx(),
-    sitemap({ filter: (url) => !url.endsWith('/search/') }),
+    sitemap({
+      filter: (url) =>
+        !url.endsWith('/search/') && !new URL(url).pathname.startsWith('/og/'),
+    }),
   ],
   markdown: { shikiConfig: { theme: 'github-light-high-contrast' } },
 });
