@@ -18,6 +18,7 @@
     "audit:content": "tsx scripts/seo-audit.ts",
     "audit:site": "tsx scripts/check-generated-site.ts",
     "sync:github": "tsx scripts/sync-github.ts",
+    "share-art": "tsx scripts/share-art.ts",
     "release:check": "tsx scripts/release-check.ts",
     "verify": "npm run check && npm run lint && npm test && npm run audit:content && npm run build && npm run audit:site"
   },

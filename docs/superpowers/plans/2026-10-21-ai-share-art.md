@@ -98,12 +98,12 @@ await assert.rejects(() => readApprovedShareArt(unsafeTarget, root));
 
 ```text
 share-art prepare blog/no-need-to-be-the-sun --out reports/share-art/blog/no-need-to-be-the-sun/v1
-share-art compose --bundle <directory> --artwork <local-file> --brief <local-markdown> --layout <local-json> --tool image_gen
+share-art compose --bundle <directory> --artwork <local-file> --brief <local-markdown> --layout <local-json> --tool image_gen [--alt <image-description>]
 share-art approve --candidate <directory> --confirmation <author-confirmation-record>
 share-art review blog/no-need-to-be-the-sun --confirmation <author-confirmation-record>
 ```
 
-Prepare writes full `input.md` with every source, a snapshot JSON (sources without text and sourceDigest), brand information and guide for Codex to write a real brief after reading. A new output directory is required; never overwrite prior bundle/candidates. Read-only external local artwork/brief/layout inputs can be copied, but generated files stay under `reports/share-art` until approval. Compose writes normalized copied artwork, brief, layout, candidate final PNG and a candidate record with target, source snapshot, all digests and tool name (model only when actually supplied). Candidate record contains no confirmed approval. Create a new versioned candidate subdirectory on every compose, preserving prior preview.
+Prepare writes full `input.md` with every source, a snapshot JSON (sources without text and sourceDigest), brand information and guide for Codex to write a real brief after reading. A new output directory is required; never overwrite prior bundle/candidates. Read-only external local artwork/brief/layout inputs can be copied, but generated files stay under `reports/share-art` until approval. Compose writes normalized copied artwork, brief, layout, candidate final PNG and a candidate record with target, source snapshot, all digests and tool name (model only when actually supplied). Accept an optional useful `--alt` description from the design brief; otherwise use the full title with site name, without claiming automatic visual inspection. Candidate record contains no confirmed approval. Create a new versioned candidate subdirectory on every compose, preserving prior preview.
 
 Layout JSON is version 1 and contains `title`, `author`, `site` text boxes, each `{left,top,width,height,fontSize,color}`; no user-supplied text. Text values come from target full title and site config. Validate boxes fit the 1200×630 canvas, positive bounded sizes and valid hex colors. Use the already verified bundled font, escaped Pango, bound text to each box (shrink/wrap as required, no overflow); do not reuse the large white template background. Sharp can normalize the input raster and composite accurate text during candidate creation only. Expose minimal font/text helpers from existing renderer; preserve original card output behavior and tests.
 

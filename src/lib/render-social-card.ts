@@ -9,11 +9,8 @@ const fontSha256 =
 const fontFamily = 'Noto Sans CJK SC';
 const titleWidth = 1024;
 
-async function verifiedFont(): Promise<string> {
-  const file = path.resolve(
-    process.cwd(),
-    'assets/fonts/NotoSansCJKsc-Regular.otf',
-  );
+export async function verifiedFont(root = process.cwd()): Promise<string> {
+  const file = path.resolve(root, 'assets/fonts/NotoSansCJKsc-Regular.otf');
   let bytes: Buffer;
   try {
     bytes = await readFile(file);
@@ -59,6 +56,33 @@ function graphemes(text: string): string[] {
     new Intl.Segmenter('zh-CN', { granularity: 'grapheme' }).segment(text),
     ({ segment }) => segment,
   );
+}
+
+export interface ShareArtTextBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  fontSize: number;
+  color: string;
+}
+
+// Candidate-time typography: keep every glyph within its measured box.
+export async function renderBoundedShareArtText(
+  value: string,
+  box: ShareArtTextBox,
+  fontfile: string,
+): Promise<Buffer> {
+  for (let size = box.fontSize; size >= 1; size--) {
+    const input = textInput(value, size, fontfile, box.color);
+    const { data, info } = await sharp({
+      text: { ...input.text, width: box.width, wrap: 'word-char' },
+    })
+      .png()
+      .toBuffer({ resolveWithObject: true });
+    if (info.width <= box.width && info.height <= box.height) return data;
+  }
+  throw new Error('Share-art text cannot fit its layout box without overflow');
 }
 
 async function measuredWidth(

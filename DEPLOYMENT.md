@@ -72,6 +72,8 @@
 
 本地确认 `reports/share-preview.html` 中的真实文章和项目卡片后提交 PR。合并部署成功后，检查线上页面元数据，以及它引用的图片是否返回 HTTP 200、`image/png` 和正确尺寸。草稿、示例、字体文件不应出现在公开产物，图片资源不应出现在页面 Sitemap 或 RSS。
 
+按全文设计的 AI 图使用 [AI 配图工作流](docs/AI_SHARE_ART.md)：创作与候选在 Codex 本地会话完成，最终 PNG 经作者确认后才进入 `assets/share-art/`；合并发布仍单独确认。CI 完全离线校验并输出已确认文件的原始字节，不调用模型。候选、原图、简报和提示词不进入公开站点；清单错误令检查失败，正文变化提示人工复核并保留旧图。
+
 本轮验收通用 OG／Twitter Card 信息及图片，不将微信、QQ、X 或 LinkedIn 的特定客户端缓存和展示效果作为门禁。没有启用 IndexNow、AI API 或统计服务。技术要素齐全不保证排名、收录或 AI 引用。
 
 参考：[Google 所有权验证](https://support.google.com/webmasters/answer/9008080)、[Bing 添加与验证站点](https://www.bing.com/webmasters/help/add-and-verify-site-12184f8b)、[Open Graph 协议](https://ogp.me/)、[Astro 官方部署](https://docs.astro.build/en/guides/deploy/github/)。

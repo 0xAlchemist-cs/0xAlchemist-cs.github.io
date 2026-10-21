@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('install','dev','check','lint','format','test','build','preview','verify','test:browser','audit:content','audit:site','sync:github','release:check')]
+  [ValidateSet('install','dev','check','lint','format','test','build','preview','verify','test:browser','audit:content','audit:site','sync:github','share-art','release:check')]
   [string]$Task = 'dev',
   [Parameter(ValueFromRemainingArguments = $true)][string[]]$TaskArguments
 )
