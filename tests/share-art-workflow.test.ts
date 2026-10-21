@@ -81,7 +81,7 @@ async function put(root: string, relative: string, value: string | Buffer) {
   await writeFile(file, value);
   return file;
 }
-async function fixture(t: TestContext) {
+async function fixture(_t: TestContext) {
   const root = await mkdtemp(path.join(tmpdir(), 'share-workflow-'));
   renderingRoots.push(root);
   const content = await put(root, 'src/content/posts/post.mdx', source);
@@ -233,6 +233,48 @@ test('site caption renders the site hostname rather than repeating the site titl
   assert.ok(
     actual.equals(expected),
     'the site caption must contain the actual site hostname',
+  );
+});
+
+test('handwritten title font is selectable and changes the candidate artwork', async (t) => {
+  const f = await fixture(t);
+  const ordinary = await composeShareArt(f.options, f.root);
+  const fontDirectory = path.join(f.root, 'assets/fonts/lxgw-wenkai');
+  await mkdir(fontDirectory, { recursive: true });
+  await copyFile(
+    path.resolve('assets/fonts/lxgw-wenkai/LXGWWenKai-Regular.ttf'),
+    path.join(fontDirectory, 'LXGWWenKai-Regular.ttf'),
+  );
+  await writeFile(
+    f.options.layout,
+    JSON.stringify({ ...layout, title: { ...layout.title, font: 'wenkai' } }),
+  );
+  const handwritten = await composeShareArt(f.options, f.root);
+  assert.equal(
+    (await readFile(path.join(ordinary, 'final.png'))).equals(
+      await readFile(path.join(handwritten, 'final.png')),
+    ),
+    false,
+  );
+  // Pango keeps successfully registered font files open on Windows. Exercise
+  // missing and corrupt font checks in a separate root, before registration.
+  const invalid = await fixture(t);
+  await writeFile(
+    invalid.options.layout,
+    JSON.stringify({ ...layout, title: { ...layout.title, font: 'wenkai' } }),
+  );
+  await assert.rejects(
+    composeShareArt(invalid.options, invalid.root),
+    /font.*missing/i,
+  );
+  await put(
+    invalid.root,
+    'assets/fonts/lxgw-wenkai/LXGWWenKai-Regular.ttf',
+    'corrupt font',
+  );
+  await assert.rejects(
+    composeShareArt(invalid.options, invalid.root),
+    /font.*SHA256/i,
   );
 });
 

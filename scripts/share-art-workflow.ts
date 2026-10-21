@@ -16,7 +16,8 @@ import {
 } from '../src/lib/share-art';
 import {
   renderBoundedShareArtText,
-  verifiedFont,
+  verifiedArtFont,
+  artFontNames,
 } from '../src/lib/render-social-card';
 
 export interface ComposeShareArtOptions {
@@ -33,7 +34,7 @@ const nonblank = z.string().trim().min(1);
 const brandSchema = z.strictObject({
   author: nonblank,
   title: nonblank,
-  url: z.string().url(),
+  url: z.url(),
 });
 const currentBrand = () => ({
   author: site.author,
@@ -54,6 +55,7 @@ const boxSchema = z
     height: z.number().int().positive().max(630),
     fontSize: z.number().int().min(8).max(160),
     color: z.string().regex(/^#[a-fA-F0-9]{6}$/),
+    font: z.enum(artFontNames).optional(),
   })
   .refine(
     (box) => box.left + box.width <= 1200 && box.top + box.height <= 630,
@@ -278,8 +280,6 @@ export async function composeShareArt(
     .png()
     .toBuffer();
   const artworkExtension = format === 'jpeg' ? 'jpg' : format;
-  await safeArtFile(root, 'assets/fonts', 'NotoSansCJKsc-Regular.otf');
-  const fontfile = await verifiedFont(root);
   const values = {
     title: snapshot.title,
     author: snapshot.brand.author,
@@ -288,8 +288,14 @@ export async function composeShareArt(
   const layers = [];
   for (const key of ['title', 'author', 'site'] as const) {
     const box = layout[key];
+    const selectedFont = await verifiedArtFont(box.font ?? 'sans', root);
     layers.push({
-      input: await renderBoundedShareArtText(values[key], box, fontfile),
+      input: await renderBoundedShareArtText(
+        values[key],
+        box,
+        selectedFont.file,
+        selectedFont.family,
+      ),
       left: box.left,
       top: box.top,
     });

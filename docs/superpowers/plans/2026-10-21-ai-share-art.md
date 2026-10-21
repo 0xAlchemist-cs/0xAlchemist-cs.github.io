@@ -8,6 +8,8 @@
 
 **Tech Stack:** Existing Node 22.22.0, TypeScript strict, Astro, YAML/Zod, Sharp and bundled Noto Sans CJK SC. No new dependencies.
 
+**2026-10-21 implementation update:** All three code tasks and Windows verification are complete; same-head Ubuntu evidence is pending. Author requested a softer title font and explicitly adopted the resulting WenKai candidate (final PNG SHA256 `3b68eb278e193abff92c3074b2f9367061d945a7e666d18eceb2f1cd0411779d`). It is now imported with the actual confirmation record. Merge/deploy remains unapproved. Optional per-box `font` is `sans` (default) or `wenkai`, both pinned, licensed and checksum-verified. Original artwork bytes are preserved; only the candidate's compositing base is normalized. The final review's content-source allowlist finding is fixed and its scoped re-review passed. Immutable approved resources are excluded from automatic formatting and validated by their digests instead.
+
 ## Global Constraints
 
 - Binding design: `docs/superpowers/specs/2026-10-21-ai-share-art-design.md`, approved 2026-10-21. Keep existing article text, reading UI, particle background, search verification, production visibility, and zero new paid API dependencies.
@@ -65,7 +67,7 @@ safeArtFile(root: string, directory: string, filename: string): Promise<string>;
 
 `root` defaults to process.cwd(). Source paths use forward slashes relative to root. Look up frontmatter slugs, including nested `.md/.mdx`, rather than assuming filenames. Reject duplicate slugs. Use existing schema semantics for matching project-related articles (both explicit relatedPosts and matching relatedRepos). Source walking must never follow symbolic links. `sourceDigest` sorts and hashes JSON of path/digest records, rejecting duplicates/unsafe paths. `safeArtFile` constrains directory inside root and filenames to a single safe leaf, validates every path component without following links. All four manifest files must exist and match SHA256; final PNG must fully decode to 1200×630. Verify manifest target and its stored aggregate. Missing manifest alone means unconfigured; other read/schema/decode/hash errors fail. Current-source digest mismatch yields needs_review, not replacement or rejection.
 
-- [ ] Write fixtures with same blog/project slug, nested content, two linked articles and a long-tail marker; assert the prepared text includes the marker and all raw frontmatter.
+- [x] Write fixtures with same blog/project slug, nested content, two linked articles and a long-tail marker; assert the prepared text includes the marker and all raw frontmatter.
 
 ```ts
 assert.equal(
@@ -77,7 +79,7 @@ assert.notEqual(before.sourceDigest, afterLinkedArticleChange.sourceDigest);
 assert.equal(await readApprovedShareArt(target, root), null);
 ```
 
-- [ ] Run the new tests, record the expected behavioral failures before implementation. Implement source loading and manifest validation. Cover digest/target/dimension/corruption/approval/alt failures and symlink escape. Synthetic fixtures explicitly identify generator as test-fixture, never claim model invocation.
+- [x] Run the new tests, record the expected behavioral failures before implementation. Implement source loading and manifest validation. Cover digest/target/dimension/corruption/approval/alt failures and symlink escape. Synthetic fixtures explicitly identify generator as test-fixture, never claim model invocation.
 
 ```ts
 assert.equal(approved.status, 'current');
@@ -86,7 +88,7 @@ assert.equal(afterEdit.status, 'needs_review');
 await assert.rejects(() => readApprovedShareArt(unsafeTarget, root));
 ```
 
-- [ ] Run `node --import tsx --test tests/share-art.test.ts`, then original `tests/social-card.test.ts`; inspect results and self-review. Write task report with RED/GREEN evidence and exact exports. Root commits task-owned files after task review.
+- [x] Run `node --import tsx --test tests/share-art.test.ts`, then original `tests/social-card.test.ts`; inspect results and self-review. Write task report with RED/GREEN evidence and exact exports. Root commits task-owned files after task review.
 
 ### Task 2: Author commands, candidate composition, approval and re-review
 
@@ -109,7 +111,7 @@ Layout JSON is version 1 and contains `title`, `author`, `site` text boxes, each
 
 Approve requires explicit nonempty `--confirmation`, validates all candidate digests and current source snapshot, rejects stale candidates, and copies exact final/art/brief/layout bytes to digest-named files under `assets/share-art/<kind>/<slug>/`. Only then write a strict approved manifest atomically, leaving previously approved files untouched. No silent approval from file existence, candidate creation or tests. Review re-validates an existing approval, reads current sources, updates source/review confirmation while preserving exact PNG bytes. Both writer paths reject symlink/traversal directories and mismatched target. Repeating commands must not destroy previous files.
 
-- [ ] Test prepare with a raw long-content marker and verify no approved directory is created; test compose with a synthetic raster and escaped/mixed-language text. Use a copied real bundled font in temporary roots for realistic rendering.
+- [x] Test prepare with a raw long-content marker and verify no approved directory is created; test compose with a synthetic raster and escaped/mixed-language text. Use a copied real bundled font in temporary roots for realistic rendering.
 
 ```ts
 assert.equal(await exists(approvedManifestPath), false);
@@ -118,9 +120,9 @@ assert.equal((await sharp(candidatePng).metadata()).height, 630);
 assert.deepEqual(approved.png, candidateBytes);
 ```
 
-- [ ] Record a real failing approval/lifecycle assertion, implement workflow, and cover no-confirmation/stale/tamper/unsafe path rejection, preserving old selected bytes on replacement and review. Test tool metadata does not invent a model name. Run new workflow tests and prior library/renderer tests.
-- [ ] Document realistic PowerShell examples, Codex-only generation boundary, full-text reading, accurate typography, candidate confirmation, image replacement and source review. Root writes the actual essay brief and generates the real sample separately; do not fabricate or approve it.
-- [ ] Write task report with test evidence, command API and concerns; root commits owned files after task review.
+- [x] Record a real failing approval/lifecycle assertion, implement workflow, and cover no-confirmation/stale/tamper/unsafe path rejection, preserving old selected bytes on replacement and review. Test tool metadata does not invent a model name. Run new workflow tests and prior library/renderer tests.
+- [x] Document realistic PowerShell examples, Codex-only generation boundary, full-text reading, accurate typography, candidate confirmation, image replacement and source review. Root writes the actual essay brief and generates the real sample separately; do not fabricate or approve it.
+- [x] Write task report with test evidence, command API and concerns; root commits owned files after task review.
 
 ### Task 3: Static integration, independent audit and release evidence
 
@@ -132,7 +134,7 @@ assert.deepEqual(approved.png, candidateBytes);
 
 Extend sharing report cards with art status `{source:'template'|'ai', approval:'not_configured'|'confirmed', review:'not_required'|'current'|'needs_review'}`. Map only visible source content to audit pages. Allow an optional author root in audit options for independent fixtures. Audit compares emitted PNG SHA256 to the selected final PNG (independently of URL naming), reports stale source warnings, and errors on invalid explicit config. Existing generic metadata/image/verification checks remain. Offline HTML and Markdown show source and review state without publishing brief, prompt, source text or internal paths into dist. Ensure candidates and hidden assets cannot generate public OG files.
 
-- [ ] Add behavioral tests before resolver/integration: expected AI endpoint bytes and URL should differ from the old template, all image metadata must use approved alt and the same URL; editing artwork changes URL, editing source only warns. Record RED then GREEN.
+- [x] Add behavioral tests before resolver/integration: expected AI endpoint bytes and URL should differ from the old template, all image metadata must use approved alt and the same URL; editing artwork changes URL, editing source only warns. Record RED then GREEN.
 
 ```ts
 assert.deepEqual(builtPng, approvedFinalPng);
@@ -141,12 +143,12 @@ assert.equal(ogUrl, blogPostingImage);
 assert.match(staleAudit.warnings.join('\n'), /复核|review/i);
 ```
 
-- [ ] In the disposable browser fixture only, create a clearly marked synthetic test approval for the visible integration article and verify emitted exact bytes, metadata/cover independence and privacy canaries. Retain fallback tests for other content; never register a real approval for the sample. Avoid changing the canonical content to manufacture tests.
-- [ ] Run focused tests, root full `verify`, rebuilt sharing browser tests and appropriate full browser regression. Inspect real desktop/mobile candidate and existing real content preview. Font/brief/source/candidate canaries and hidden OG paths must not leak into dist, Sitemap, Pagefind or RSS.
+- [x] In the disposable browser fixture only, create a clearly marked synthetic test approval for the visible integration article and verify emitted exact bytes, metadata/cover independence and privacy canaries. Retain fallback tests for other content; never register a real approval for the sample. Avoid changing the canonical content to manufacture tests.
+- [x] Run focused tests, root full `verify`, rebuilt sharing browser tests and appropriate full browser regression. Inspect real desktop/mobile candidate and existing real content preview. Font/brief/source/candidate canaries and hidden OG paths must not leak into dist, Sitemap, Pagefind or RSS.
 - [ ] Write task report, then root commits reviewed changes, updates PR #7 with sample preview instructions and checks, pushes, verifies same-head Ubuntu CI and downloads card evidence. User confirms sample before approval-import; user confirms merge separately. No merge/deploy in this implementation turn absent that confirmation.
 
 ## Controller-owned real sample and final gate
 
-- [ ] Read the full essay, save a content-specific brief under `reports/share-art`, invoke the built-in image tool for artwork with a calm blue/cream editorial composition. Read the imagegen skill and use the actual image tool; do not substitute a vector mock for generated art.
-- [ ] Once author commands exist, prepare the real bundle, compose title/author/site with the verified font, visually inspect and expose the exact final 1200×630 candidate. Save prompt and tool provenance without claiming an unreported model name. Do not run approve before the author confirms that candidate.
+- [x] Read the full essay, save a content-specific brief under `reports/share-art`, invoke the built-in image tool for artwork with a calm blue/cream editorial composition. Read the imagegen skill and use the actual image tool; do not substitute a vector mock for generated art.
+- [x] Once author commands exist, prepare the real bundle, compose title/author/site with the verified font, visually inspect and expose the exact final 1200×630 candidate. Save prompt and tool provenance without claiming an unreported model name. Do not run approve before the author confirms that candidate.
 - [ ] Complete task and whole-branch review, keep durable test/CI evidence, update PR and show the candidate to author. Ask only for the concrete candidate approval, with merge approval remaining explicit.

@@ -1,7 +1,58 @@
 import { test, expect } from '@playwright/test';
 import sharp from 'sharp';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
 const fixture = 'http://127.0.0.1:4322';
+
+test('已确认配图原样输出，内部简报与清单不进入网页', async ({ page }) => {
+  const build = JSON.parse(
+    await readFile('reports/browser-build.json', 'utf8'),
+  );
+  const manifest = JSON.parse(
+    await readFile(
+      join(
+        build.root,
+        'assets/share-art/blog/integration-visible/manifest.json',
+      ),
+      'utf8',
+    ),
+  );
+  expect(manifest.generator.tool).toBe('test-fixture');
+  await page.goto(fixture + '/blog/integration-visible/');
+  const image = (await page
+    .locator('meta[property="og:image"]')
+    .getAttribute('content'))!;
+  const response = await page.request.get(fixture + new URL(image).pathname);
+  expect(response.status()).toBe(200);
+  expect(
+    createHash('sha256')
+      .update(await response.body())
+      .digest('hex'),
+  ).toBe(manifest.image.sha256);
+  await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
+    'content',
+    manifest.alt,
+  );
+  expect(await page.content()).not.toContain(
+    'SHARE_ART_PRIVATE_CANARY_20261021',
+  );
+  expect(
+    (
+      await page.request.get(
+        fixture + '/assets/share-art/blog/integration-visible/manifest.json',
+      )
+    ).status(),
+  ).toBe(404);
+  expect(
+    (
+      await page.request.get(
+        fixture + '/assets/share-art/blog/integration-visible/brief.md',
+      )
+    ).status(),
+  ).toBe(404);
+});
 
 test('文章与项目使用独立中文分享图，正文封面不覆盖分享元数据', async ({
   page,

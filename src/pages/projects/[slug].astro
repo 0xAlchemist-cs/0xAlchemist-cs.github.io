@@ -11,7 +11,7 @@ import {
   type Project,
 } from '../../lib/content';
 import { breadcrumbs } from '../../lib/seo';
-import { projectCard } from '../../lib/social-card';
+import { projectCard, resolveSocialCard } from '../../lib/social-card';
 import rawCache from '../../data/github-public-cache.json';
 import { cacheSchema } from '../../lib/github';
 export async function getStaticPaths() {
@@ -24,7 +24,7 @@ interface Props {
   project: Project;
 }
 const { project } = Astro.props;
-const card = projectCard(project.data);
+const card = await resolveSocialCard(projectCard(project.data));
 const { Content } = await render(project);
 const articles = linkedPosts(project, await posts());
 const parsed = cacheSchema.safeParse(rawCache);

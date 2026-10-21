@@ -3,26 +3,56 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp, { type OverlayOptions } from 'sharp';
 import type { SocialCard } from './social-card';
+import { safeArtFile } from './share-art';
 
 const fontSha256 =
   '2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b';
 const fontFamily = 'Noto Sans CJK SC';
 const titleWidth = 1024;
 
+export const artFontNames = ['sans', 'wenkai'] as const;
+export type ArtFontName = (typeof artFontNames)[number];
+const artFonts = {
+  sans: {
+    file: 'NotoSansCJKsc-Regular.otf',
+    sha256: fontSha256,
+    family: fontFamily,
+  },
+  wenkai: {
+    file: 'lxgw-wenkai/LXGWWenKai-Regular.ttf',
+    sha256: '2d73eea94ad808999d90c0000c239a84a33b09d4bc6ab6c5b8bbf1eda8a7fc8b',
+    family: 'LXGW WenKai',
+  },
+} as const;
+
 export async function verifiedFont(root = process.cwd()): Promise<string> {
-  const file = path.resolve(root, 'assets/fonts/NotoSansCJKsc-Regular.otf');
+  return (await verifiedArtFont('sans', root)).file;
+}
+
+export async function verifiedArtFont(
+  name: ArtFontName,
+  root = process.cwd(),
+): Promise<{ file: string; family: string }> {
+  if (!Object.hasOwn(artFonts, name)) throw new Error('Unknown share-art font');
+  const definition = artFonts[name];
+  const file = path.resolve(root, 'assets/fonts', definition.file);
   let bytes: Buffer;
   try {
+    await safeArtFile(
+      root,
+      path.posix.join('assets/fonts', path.posix.dirname(definition.file)),
+      path.posix.basename(definition.file),
+    );
     bytes = await readFile(file);
   } catch (error) {
     throw new Error(`Social-card font missing or unreadable: ${file}`, {
       cause: error,
     });
   }
-  if (createHash('sha256').update(bytes).digest('hex') !== fontSha256) {
+  if (createHash('sha256').update(bytes).digest('hex') !== definition.sha256) {
     throw new Error(`Social-card font SHA256 mismatch: ${file}`);
   }
-  return file;
+  return { file, family: definition.family };
 }
 
 function escapeMarkup(text: string): string {
@@ -39,11 +69,12 @@ function textInput(
   size: number,
   fontfile: string,
   color: string,
+  family = fontFamily,
 ) {
   return {
     text: {
       text: `<span foreground="${color}" fallback="false">${escapeMarkup(text)}</span>`,
-      font: `${fontFamily} ${size}`,
+      font: `${family} ${size}`,
       fontfile,
       rgba: true,
       dpi: 72,
@@ -65,6 +96,7 @@ export interface ShareArtTextBox {
   height: number;
   fontSize: number;
   color: string;
+  font?: ArtFontName;
 }
 
 // Candidate-time typography: keep every glyph within its measured box.
@@ -72,9 +104,10 @@ export async function renderBoundedShareArtText(
   value: string,
   box: ShareArtTextBox,
   fontfile: string,
+  family = fontFamily,
 ): Promise<Buffer> {
   for (let size = box.fontSize; size >= 1; size--) {
-    const input = textInput(value, size, fontfile, box.color);
+    const input = textInput(value, size, fontfile, box.color, family);
     const { data, info } = await sharp({
       text: { ...input.text, width: box.width, wrap: 'word-char' },
     })

@@ -4,6 +4,8 @@ dist/
 .tools/
 .superpowers/
 reports/
+# Content-addressed approval files must retain the exact confirmed bytes.
+assets/share-art/
 test-results/
 playwright-report/
 package-lock.json

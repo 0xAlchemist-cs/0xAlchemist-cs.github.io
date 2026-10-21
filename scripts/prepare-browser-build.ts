@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { stringify } from 'yaml';
 import { parseFrontmatter, sourceFiles } from './content-files';
+import { writeApprovedArtFixture } from '../tests/fixtures/share-art';
 
 // Build real test content in a disposable, ignored workspace, never in the author's source tree.
 await mkdir('.tools', { recursive: true });
@@ -85,6 +86,13 @@ await writeFile(
   join(root, 'src/content/projects/integration-project.md'),
   `---\n${stringify({ slug: 'integration-project', repoFullName: 'test-owner/test-repo', displayName: '关联项目集成测试', summary: '仅存在于隔离构建中的项目，用于验证文章与项目双向关联。', techStack: ['TypeScript'], featured: true, relatedPosts: [] })}---\n\n## 测试项目\n\nPython 图文信号回放，连接事件与结果。通过复习检查长短词。用于隔离构建，绝不发布。\n`,
 );
+// Synthetic geometry only; this exercises approved-file delivery, never a model
+// invocation or a real author approval. All files stay in this disposable root.
+await writeApprovedArtFixture(root, {
+  kind: 'blog',
+  slug: 'integration-visible',
+});
+
 function run(args: string[]) {
   const result = spawnSync(process.execPath, args, {
     cwd: root,

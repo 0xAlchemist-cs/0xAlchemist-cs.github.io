@@ -6,6 +6,7 @@ import {
   mkdir,
   writeFile,
 } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join, relative, resolve, sep } from 'node:path';
 import { parse, type HTMLElement } from 'node-html-parser';
 import sharp from 'sharp';
@@ -15,8 +16,14 @@ import {
   type SearchVerification,
 } from '../src/config/site';
 import { writeReport, type AuditReport } from './report';
+import { readApprovedShareArt } from '../src/lib/share-art';
 
 export interface SharingCard {
+  art: {
+    source: 'template' | 'ai';
+    approval: 'not_configured' | 'confirmed';
+    review: 'not_required' | 'current' | 'needs_review';
+  };
   page: string;
   title: string;
   description: string;
@@ -137,6 +144,7 @@ function blogPostings(value: unknown): Record<string, unknown>[] {
 export async function auditSharing(
   directory = 'dist',
   verification: SearchVerification = searchVerification,
+  options: { authorRoot?: string } = {},
 ): Promise<SharingAuditReport> {
   const root = resolve(directory);
   const tokens = {
@@ -235,9 +243,44 @@ export async function auditSharing(
         png = decodePng(target);
         decoded.set(target, png);
       }
-      await png;
+      const bytes = await png;
+      let art: SharingCard['art'] = {
+        source: 'template',
+        approval: 'not_configured',
+        review: 'not_required',
+      };
+      if (contentRoute) {
+        const approved = await readApprovedShareArt(
+          {
+            kind: contentRoute[1] as 'blog' | 'projects',
+            slug: contentRoute[2]!,
+          },
+          options.authorRoot,
+        );
+        if (approved) {
+          art = {
+            source: 'ai',
+            approval: 'confirmed',
+            review: approved.status,
+          };
+          if (
+            createHash('sha256').update(bytes).digest('hex') !==
+            approved.manifest.image.sha256
+          )
+            error(
+              'Generated PNG SHA256 differs from the approved final image.',
+            );
+          if (alt !== approved.manifest.alt)
+            error('Sharing image alt differs from the approved description.');
+          if (approved.status === 'needs_review')
+            report.warnings.push(
+              `${page}: 正文或关联文章变化，已确认配图需要复核；保留原图。`,
+            );
+        }
+      }
       if (expectedImage)
         report.cards.push({
+          art,
           page,
           title,
           description,
@@ -298,6 +341,10 @@ export async function auditSharing(
       );
     if (/\.(?:woff2?|ttf|otf|eot)$/i.test(label))
       report.errors.push(`${label}: font files must not be published.`);
+    if (/(?:^|\/)(?:assets|reports)\/share-art(?:\/|$)/i.test(label))
+      report.errors.push(
+        `${label}: private share-art working resources must not be published.`,
+      );
     if (/(?:^|\/)(?:sitemap[^/]*|rss|feed)\.xml$/i.test(label)) {
       const xml = await readFile(file, 'utf8');
       if (/\/og\//i.test(xml) || /\/og\//i.test(parse(xml).text))
@@ -307,6 +354,7 @@ export async function auditSharing(
     }
   }
   report.errors = [...new Set(report.errors)];
+  report.warnings = [...new Set(report.warnings)];
   return report;
 }
 
@@ -327,6 +375,17 @@ export async function writeSharingReport(
     'reports/sharing.md',
     `\n## 搜索平台验证\n\n状态：${report.verification.status}。Google：${report.verification.configured.google ? '已配置' : '未配置'}；Bing：${report.verification.configured.bing ? '已配置' : '未配置'}。\n\n## 待完成的平台操作\n\n- 账号验证：${report.platformOperations.accountVerification}；需要在平台确认站点所有权。\n- Sitemap 提交：${report.platformOperations.sitemapSubmission}；需要在平台提交站点地图。\n- 收录检查：${report.platformOperations.indexingInspection}；需要在平台查看抓取和收录状态。\n\n本地静态检查无法判定这些平台操作是否已完成。\n`,
   );
+  await appendFile(
+    'reports/sharing.md',
+    '\n## 配图来源与复核\n\n| 页面 | 来源 | 确认 | 复核 |\n| --- | --- | --- | --- |\n' +
+      report.cards
+        .map(
+          (card) =>
+            `| ${card.page} | ${card.art.source} | ${card.art.approval} | ${card.art.review} |`,
+        )
+        .join('\n') +
+      '\n',
+  );
   const cards: string[] = [];
   // Show the site's default once, alongside the distinct content cards.
   const previewCards = report.cards.filter(
@@ -337,7 +396,7 @@ export async function writeSharingReport(
       const image = await resolveImage(resolve(directory), card.image);
       const bytes = await decodePng(image);
       cards.push(
-        `<article><img width="1200" height="630" src="data:image/png;base64,${bytes.toString('base64')}" alt="${escapeHtml(card.alt)}"><div><h2>${escapeHtml(card.title)}</h2><p>${escapeHtml(card.description)}</p><p class="page">${escapeHtml(card.page)}</p></div></article>`,
+        `<article><img width="1200" height="630" src="data:image/png;base64,${bytes.toString('base64')}" alt="${escapeHtml(card.alt)}"><div><h2>${escapeHtml(card.title)}</h2><p>${escapeHtml(card.description)}</p><p class="page">${escapeHtml(card.page)}</p><p class="page">${card.art.source === 'ai' ? '已确认配图' : '文字模板'} · ${card.art.review === 'needs_review' ? '来源已变化，需要复核' : card.art.approval === 'confirmed' ? '已确认，来源一致' : '尚未配置独立插画'}</p></div></article>`,
       );
     } catch {
       /* Error reports remain useful when a missing image cannot be previewed. */

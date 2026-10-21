@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "target": {
+    "kind": "blog",
+    "slug": "no-need-to-be-the-sun"
+  },
+  "sources": [
+    {
+      "path": "src/content/posts/no-need-to-be-the-sun.md",
+      "sha256": "0a7727baf78ea9ada53421592b4aa03cb3eddc3ff918619bc7ca025f373a21a3"
+    }
+  ],
+  "sourceDigest": "2a23c89c81fc663b70bb4ea5009ab9937a6bb53b2d55a8eafec7df118a14e6af",
+  "image": {
+    "file": "image-3b68eb278e193abff92c3074b2f9367061d945a7e666d18eceb2f1cd0411779d.png",
+    "sha256": "3b68eb278e193abff92c3074b2f9367061d945a7e666d18eceb2f1cd0411779d"
+  },
+  "artwork": {
+    "file": "artwork-9e9e1c3b0bf92313c072c8f41514802390701b3fa0f2dd6f1098a436f0bc81ad.png",
+    "sha256": "9e9e1c3b0bf92313c072c8f41514802390701b3fa0f2dd6f1098a436f0bc81ad"
+  },
+  "brief": {
+    "file": "brief-b586091f473199e7f7abdba714b53019b27843beb051d22292db5f326c68493e.md",
+    "sha256": "b586091f473199e7f7abdba714b53019b27843beb051d22292db5f326c68493e"
+  },
+  "layout": {
+    "file": "layout-8d7724e5f26aceb0d0b42beb8660ff9083c2e4b76ee4b360f341f7338e31e2f4.json",
+    "sha256": "8d7724e5f26aceb0d0b42beb8660ff9083c2e4b76ee4b360f341f7338e31e2f4"
+  },
+  "alt": "不必成为太阳 — 0xAlchemist 的博客",
+  "generator": {
+    "tool": "image_gen"
+  },
+  "approval": {
+    "confirmed": true,
+    "record": "2026-10-21 作者在当前会话明确回复：采用这版文楷分享图。确认对应最终 PNG SHA256 3b68eb278e193abff92c3074b2f9367061d945a7e666d18eceb2f1cd0411779d；此记录不代表确认合并上线。"
+  }
+}

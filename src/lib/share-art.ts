@@ -43,7 +43,14 @@ function safeLeaf(value: string): boolean {
 }
 
 const sourceRecordSchema = z.strictObject({
-  path: z.string().refine(safeRelativePath, 'Unsafe source path'),
+  path: z
+    .string()
+    .refine(
+      (value) =>
+        safeRelativePath(value) &&
+        /^src\/content\/(posts|projects)\/.+\.mdx?$/.test(value),
+      'Source path must be a safe content Markdown or MDX file',
+    ),
   sha256: sha256Schema,
 });
 const artFileSchema = z.strictObject({

@@ -1,0 +1,4 @@
+# Approved artwork and provenance are hash-verified; never convert their bytes.
+assets/share-art/** -text
+# Preserve the upstream font license verbatim, including original whitespace.
+assets/fonts/lxgw-wenkai/OFL.txt -text -whitespace

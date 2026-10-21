@@ -1,6 +1,6 @@
 # 按全文设计 AI 分享图
 
-日常可以直接对 Codex 说：“请读完这篇文章，给它做分享图。”每篇图先有全文设计简报，再用当前会话内置生图工具创作，最后由你确认完整图片。文字通过仓库中的 Noto Sans CJK SC 字体排版，最终为 1200×630 PNG。
+日常可以直接对 Codex 说：“请读完这篇文章，给它做分享图。”每篇图先有全文设计简报，再用当前会话内置生图工具创作，最后由你确认完整图片。文字使用仓库中经过校验的本地字体排版，最终为 1200×630 PNG。
 
 网站、命令和 GitHub Actions 不调用模型，不需要额外模型 Key。生图使用当前会话的工具与额度，不承诺无限免费使用。命令负责整理输入、合成和保存，不能代替 Codex 阅读理解全文。
 
@@ -18,7 +18,7 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 share-art prepare b
 
 ## 合成带文字的候选
 
-给模型的插画提示词说明标题区域的留白，先生成主体画面，再创建版本 1 的排版 JSON。文字自动读取文章完整标题、作者和站点域名，JSON 只放位置、大小和颜色。例如：
+给模型的插画提示词说明标题区域的留白，先生成主体画面，再创建版本 1 的排版 JSON。文字自动读取文章完整标题、作者和站点域名，JSON 只放位置、大小、颜色和可选字体。每个文字框的 `font` 可选 `sans`（Noto Sans CJK SC，默认）或 `wenkai`（霞鹜文楷，适合随笔标题）。两者均随仓库保存原始字体、授权和 SHA256，合成时校验，不下载网络字体。例如：
 
 ```json
 {
@@ -29,7 +29,8 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 share-art prepare b
     "width": 480,
     "height": 120,
     "fontSize": 64,
-    "color": "#22374c"
+    "color": "#22374c",
+    "font": "wenkai"
   },
   "author": {
     "left": 68,
@@ -55,6 +56,8 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 share-art compose -
 ```
 
 每次合成创建新的 `candidate-...` 子目录，保存原始插画、简报、排版、`final.png` 和 `candidate.json`。预览 `final.png`，检查主题表达、中文、裁切、文字可读性和品牌。候选尚未发布，也不会因为生成成功就自动入库。源正文或品牌在准备后变化会拒绝合成／确认；重新准备新版本，复核当前文章后再确认。
+
+入库后的资源以摘要命名并校验，`assets/share-art/` 排除在自动代码格式化之外，避免修改已经确认的原始文件。变更简报、排版或图片时，请创建新候选，不要直接编辑这些文件。
 
 ## 作者确认后入库
 

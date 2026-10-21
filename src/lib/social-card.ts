@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { site } from '../config/site';
+import { readApprovedShareArt, type ApprovedShareArt } from './share-art';
 
 export interface SocialImage {
   src: string;
@@ -9,6 +10,7 @@ export interface SocialImage {
 }
 
 export interface SocialCard {
+  approvedArt?: ApprovedShareArt;
   kind: 'blog' | 'projects';
   slug: string;
   title: string;
@@ -20,6 +22,38 @@ export interface SocialCard {
   templateVersion: string;
   fontVersion: string;
   image: SocialImage;
+}
+
+export async function resolveSocialCard(
+  card: SocialCard,
+  root = process.cwd(),
+): Promise<SocialCard> {
+  const approvedArt = await readApprovedShareArt(
+    { kind: card.kind, slug: card.slug },
+    root,
+  );
+  if (!approvedArt) return card;
+  const hash = createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: 'approved-share-art-1',
+        card: card.image.src,
+        image: approvedArt.manifest.image.sha256,
+        layout: approvedArt.manifest.layout.sha256,
+        font: card.fontVersion,
+      }),
+    )
+    .digest('hex')
+    .slice(0, 12);
+  return {
+    ...card,
+    approvedArt,
+    image: {
+      ...card.image,
+      src: `/og/${card.kind}/${card.slug}-${hash}.png`,
+      alt: approvedArt.manifest.alt,
+    },
+  };
 }
 
 export const defaultSocialImage: SocialImage = {

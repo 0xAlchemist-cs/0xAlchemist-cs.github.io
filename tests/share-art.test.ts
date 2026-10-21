@@ -97,6 +97,23 @@ async function approvedFixture(t: TestContext) {
   return { root, directory, png, manifest, save };
 }
 
+test('reader rejects non-content provenance even when its aggregate digest matches', async (t) => {
+  const f = await approvedFixture(t);
+  for (const invalid of [
+    'README.md',
+    'src/config/site.ts',
+    'src/content/posts/article.txt',
+  ]) {
+    f.manifest.sources = [{ path: invalid, sha256: 'a'.repeat(64) }];
+    f.manifest.sourceDigest = hash(JSON.stringify(f.manifest.sources));
+    await f.save();
+    await assert.rejects(
+      readApprovedShareArt(target, f.root),
+      /source|path|content|Markdown/i,
+    );
+  }
+});
+
 test('source snapshots resolve frontmatter slugs and include full project dependencies and raw text', async (t) => {
   const root = await fixture(t);
   const snapshot = await readArtSources(target, root);
@@ -158,15 +175,17 @@ test('source digests normalize CRLF but include linked article and frontmatter e
 });
 
 test('digest hashes canonical sorted path/digest JSON and rejects duplicate or unsafe records', () => {
-  const a = { path: 'src/a.md', sha256: 'a'.repeat(64) };
-  const b = { path: 'src/b.md', sha256: 'b'.repeat(64) };
+  const a = { path: 'src/content/posts/a.md', sha256: 'a'.repeat(64) };
+  const b = { path: 'src/content/posts/b.md', sha256: 'b'.repeat(64) };
   assert.equal(sourceDigest([b, a]), hash(JSON.stringify([a, b])));
   assert.equal(
     sourceDigest([{ sha256: a.sha256, path: a.path }]),
     hash(JSON.stringify([a])),
   );
   assert.throws(() => sourceDigest([a, a]));
-  assert.throws(() => sourceDigest([a, { ...a, path: 'SRC/a.md' }]));
+  assert.throws(() =>
+    sourceDigest([a, { ...a, path: 'src/content/posts/A.md' }]),
+  );
   for (const unsafe of [
     '../a',
     '/a',
@@ -185,13 +204,17 @@ test('digest hashes canonical sorted path/digest JSON and rejects duplicate or u
 
 test('digest accepts full source snapshots but hashes only path and SHA256 records', () => {
   const source = {
-    path: 'src/a.md',
+    path: 'src/content/posts/a.md',
     sha256: 'a'.repeat(64),
     text: 'complete raw source',
   };
   assert.equal(
     sourceDigest([source]),
-    hash(JSON.stringify([{ path: 'src/a.md', sha256: 'a'.repeat(64) }])),
+    hash(
+      JSON.stringify([
+        { path: 'src/content/posts/a.md', sha256: 'a'.repeat(64) },
+      ]),
+    ),
   );
 });
 
