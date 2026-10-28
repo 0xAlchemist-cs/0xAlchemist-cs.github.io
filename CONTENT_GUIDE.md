@@ -80,7 +80,7 @@ powershell -ExecutionPolicy Bypass -File scripts/project.ps1 format
 
 只请求已精选、非草稿、非示例项目。无 Token 可尝试公开 API；超时、断网或限流时保留有效缓存，首次失败则使用手工资料，不编造 Star。成功数据注明快照获取日期；公开字段没有变化时保留原快照及日期，避免只有时间变化的更新。
 
-当前精选项目为 `ielts-workspace` 和 `signal-vision-backtest`；配置、介绍文章、项目页与 GitHub 链接均可单独维护。取消精选后再次同步会清理对应缓存。
+当前精选项目为 `ielts-workspace`、`signal-vision-backtest` 和 `lolping-ai`；首页最多展示三个精选项目。配置、介绍文章、项目页与 GitHub 链接均可单独维护。取消精选后再次同步会清理对应缓存。
 
 GitHub Actions 的 **Review public project metadata** 每周一北京时间约 09:17 检查，也可手动运行。只读任务使用 `--strict`：任一仓库同步失败时保留原文件并失败退出；校验、构建和产物审计通过后，才把缓存交给单独的写入任务。
 

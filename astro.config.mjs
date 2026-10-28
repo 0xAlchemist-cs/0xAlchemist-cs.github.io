@@ -8,6 +8,8 @@ export default defineConfig({
   trailingSlash: 'always',
   devToolbar: { enabled: false },
   vite: {
+    // Keep the content loader's CommonJS YAML parser in Node's native runtime.
+    ssr: { external: ['yaml'] },
     server: {
       watch: {
         ignored: [
