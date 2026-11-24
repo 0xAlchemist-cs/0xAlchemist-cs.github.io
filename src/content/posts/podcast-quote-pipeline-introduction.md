@@ -53,10 +53,10 @@ references: []
 当前合成模板输出 **1440 × 1920** 的 PNG：上方是一张主画面，下方依次排列四条画面裁切带，并加入白字黑边的字幕、来源信息和页脚。
 
 <figure style="margin: 1.5rem 0;">
-  <a href="/images/podcast-quote-pipeline/collage-layout.svg">
-    <img src="/images/podcast-quote-pipeline/collage-layout.svg" alt="金句拼图布局：上方是主画面，下方排列四条画面与字幕带，底部标注出处。" width="720" height="608" loading="lazy" />
+  <a href="/images/podcast-quote-pipeline/leao_podpah_quote_01.png" style="display: block; max-width: 440px; margin-inline: auto;">
+    <img src="/images/podcast-quote-pipeline/leao_podpah_quote_01.png" alt="Rafael Leão 的葡语播客金句拼图：上方是访谈主画面，下方有四条字幕带，底部保留节目出处。" width="1440" height="1920" loading="lazy" />
   </a>
-  <figcaption>版式示意：主画面、四条字幕带与出处。点击查看大图。</figcaption>
+  <figcaption>项目 README 成品原图（点击放大）。节目画面来自 <a href="https://www.youtube.com/watch?v=IOTvd2wwwdU">Podpah #1063：Rafael Leão 访谈</a>，葡语字幕由项目重新排版。</figcaption>
 </figure>
 
 主画面负责交代人物与场景，字幕带承载后续句子。统一版式后，每次制作主要需要决定：选哪几句、对应哪些画面，以及文字如何分行。
